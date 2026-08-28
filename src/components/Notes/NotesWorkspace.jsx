@@ -433,8 +433,8 @@ export default function NotesWorkspace() {
                     ))}
                   </div>
 
-                  {/* Top Action Buttons (Preview Mode, Copy, + Sub-Page) */}
-                  <div className="flex items-center gap-2 self-start sm:self-center">
+                  {/* Top Action Buttons (Preview Mode, Copy, + Sub-Page, Hapus Catatan) */}
+                  <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
                     <button
                       onClick={() => setPreviewMode(!previewMode)}
                       className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all ${
@@ -444,7 +444,7 @@ export default function NotesWorkspace() {
                       }`}
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      <span>{previewMode ? 'Edit Mode' : 'Preview Mode'}</span>
+                      <span>{previewMode ? 'Mode Edit (Ubah Catatan)' : 'Mode Preview (Baca Only)'}</span>
                     </button>
 
                     <button
@@ -454,6 +454,21 @@ export default function NotesWorkspace() {
                     >
                       {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
+
+                    {!previewMode && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Apakah Anda yakin ingin menghapus catatan "${activeNote.title}"?`)) {
+                            deleteNote(activeNote.id);
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                        title="Hapus Halaman Catatan Ini"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Hapus Catatan</span>
+                      </button>
+                    )}
 
                     <button
                       onClick={handleCreateSubPage}
@@ -780,10 +795,10 @@ export default function NotesWorkspace() {
                           )}
                         </div>
 
-                        {/* Delete Block Trash Icon Button */}
+                        {/* Delete Block Trash Icon Button (Always Visible in Edit Mode) */}
                         <button
                           onClick={() => handleDeleteBlock(block.id)}
-                          className="p-1.5 rounded-lg bg-[#20222d] text-[#646a7c] hover:text-red-400 hover:bg-[#282b3a] transition-all opacity-0 group-hover/block:opacity-100 shrink-0 mt-1"
+                          className="p-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-all shrink-0 mt-1 cursor-pointer flex items-center justify-center"
                           title="Hapus Blok Ini"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
