@@ -30,7 +30,8 @@ export default function NotesWorkspace() {
   const [selectedNoteId, setSelectedNoteId] = useState(notes[0]?.id || null);
   const [activeNote, setActiveNote] = useState(notes[0] || null);
   const [expandedParents, setExpandedParents] = useState({ note_c1: true, note_c2: true });
-  const [previewMode, setPreviewMode] = useState(false);
+  const [previewMode, setPreviewMode] = useState(true);
+  const [activeMediaPreview, setActiveMediaPreview] = useState(null);
   const [copied, setCopied] = useState(false);
 
   const fileInputRef = useRef(null);
@@ -562,12 +563,41 @@ export default function NotesWorkspace() {
                           {/* Image Attachment Preview */}
                           {block.type === 'image' && (
                             <div className="space-y-2 p-3 rounded-2xl bg-[#14151a] border border-[#272935]">
-                              <img
-                                src={block.url}
-                                alt={block.fileName || 'Gambar'}
-                                className="max-h-96 max-w-full rounded-xl object-contain bg-black/40 border border-[#262835]"
-                              />
-                              {block.content && <p className="text-[11px] text-[#878d9f] italic">{block.content}</p>}
+                              <div
+                                onClick={() => setActiveMediaPreview({ url: block.url, fileName: block.fileName || block.content, type: 'image' })}
+                                className="relative group cursor-pointer overflow-hidden rounded-xl bg-black/40 border border-[#262835] flex items-center justify-center max-h-96"
+                              >
+                                <img
+                                  src={block.url}
+                                  alt={block.fileName || 'Gambar'}
+                                  className="max-h-96 max-w-full rounded-xl object-contain transition-transform duration-300 group-hover:scale-105"
+                                />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 text-white font-bold text-xs transition-opacity duration-200 backdrop-blur-[2px]">
+                                  <Eye className="w-4 h-4 text-[#0099dd]" />
+                                  <span>Klik untuk Memperbesar / Unduh</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between text-[11px] text-[#878d9f] pt-1">
+                                {block.content && <p className="italic truncate mr-2">{block.content}</p>}
+                                <div className="flex items-center gap-2 ml-auto shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveMediaPreview({ url: block.url, fileName: block.fileName || block.content, type: 'image' })}
+                                    className="px-2.5 py-1 rounded-lg bg-[#20222d] hover:bg-[#0099dd] text-[#38bdf8] hover:text-white font-semibold flex items-center gap-1 transition-all"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span>Lihat</span>
+                                  </button>
+                                  <a
+                                    href={block.url}
+                                    download={block.fileName || 'gambar_catatan'}
+                                    className="px-2.5 py-1 rounded-lg bg-[#20222d] hover:bg-emerald-600 text-emerald-400 hover:text-white font-semibold flex items-center gap-1 transition-all"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                    <span>Unduh</span>
+                                  </a>
+                                </div>
+                              </div>
                             </div>
                           )}
 
@@ -583,14 +613,25 @@ export default function NotesWorkspace() {
                                   <p className="text-[10px] text-[#787e91]">{block.fileSize || 'Dokumen'}</p>
                                 </div>
                               </div>
-                              <a
-                                href={block.url}
-                                download={block.fileName || 'file_catatan'}
-                                className="px-3 py-1.5 rounded-xl bg-[#20222d] hover:bg-[#0099dd] hover:text-white text-[#38bdf8] text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                                <span>Unduh File</span>
-                              </a>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <a
+                                  href={block.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 rounded-xl bg-[#20222d] hover:bg-[#2a2d3c] text-[#38bdf8] text-xs font-semibold flex items-center gap-1.5 transition-all"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Lihat</span>
+                                </a>
+                                <a
+                                  href={block.url}
+                                  download={block.fileName || 'file_catatan'}
+                                  className="px-3 py-1.5 rounded-xl bg-[#0099dd] hover:bg-[#0088cc] text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-cyan-900/20"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Unduh</span>
+                                </a>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -671,7 +712,7 @@ export default function NotesWorkspace() {
                             </div>
                           )}
 
-                          {/* Image Attachment Block */}
+                          {/* Image Attachment Block in Edit Mode */}
                           {block.type === 'image' && (
                             <div className="space-y-2 p-3 rounded-2xl bg-[#14151a] border border-[#272935]">
                               <div className="flex items-center justify-between text-[11px] text-[#878d9f]">
@@ -680,11 +721,20 @@ export default function NotesWorkspace() {
                                 </span>
                                 <span>{block.fileSize}</span>
                               </div>
-                              <img
-                                src={block.url}
-                                alt={block.fileName || 'Gambar'}
-                                className="max-h-96 max-w-full rounded-xl object-contain bg-black/40 border border-[#262835]"
-                              />
+                              <div
+                                onClick={() => setActiveMediaPreview({ url: block.url, fileName: block.fileName || block.content, type: 'image' })}
+                                className="relative group cursor-pointer overflow-hidden rounded-xl bg-black/40 border border-[#262835] flex items-center justify-center max-h-96"
+                              >
+                                <img
+                                  src={block.url}
+                                  alt={block.fileName || 'Gambar'}
+                                  className="max-h-96 max-w-full rounded-xl object-contain transition-transform duration-300 group-hover:scale-105"
+                                />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 text-white font-bold text-xs transition-opacity duration-200 backdrop-blur-[2px]">
+                                  <Eye className="w-4 h-4 text-[#0099dd]" />
+                                  <span>Klik untuk Memperbesar / Unduh</span>
+                                </div>
+                              </div>
                               <input
                                 type="text"
                                 value={block.content}
@@ -695,7 +745,7 @@ export default function NotesWorkspace() {
                             </div>
                           )}
 
-                          {/* File Attachment Card Block */}
+                          {/* File Attachment Card Block in Edit Mode */}
                           {block.type === 'file' && (
                             <div className="p-4 rounded-2xl bg-[#14151a] border border-[#272935] flex items-center justify-between gap-4">
                               <div className="flex items-center gap-3 min-w-0">
@@ -707,14 +757,25 @@ export default function NotesWorkspace() {
                                   <p className="text-[10px] text-[#787e91]">{block.fileSize || 'Dokumen'}</p>
                                 </div>
                               </div>
-                              <a
-                                href={block.url}
-                                download={block.fileName || 'file_catatan'}
-                                className="px-3 py-1.5 rounded-xl bg-[#20222d] hover:bg-[#0099dd] hover:text-white text-[#38bdf8] text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                                <span>Unduh File</span>
-                              </a>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <a
+                                  href={block.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 rounded-xl bg-[#20222d] hover:bg-[#2a2d3c] text-[#38bdf8] text-xs font-semibold flex items-center gap-1.5 transition-all"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Lihat</span>
+                                </a>
+                                <a
+                                  href={block.url}
+                                  download={block.fileName || 'file_catatan'}
+                                  className="px-3 py-1.5 rounded-xl bg-[#0099dd] hover:bg-[#0088cc] text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-cyan-900/20"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Unduh</span>
+                                </a>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -744,6 +805,66 @@ export default function NotesWorkspace() {
           )}
         </div>
       </div>
+
+      {/* High Resolution Image / Media Preview Lightbox Modal */}
+      {activeMediaPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in my-auto">
+          <div className="card-myits bg-[#181920] border-[#2c2f3d] w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl space-y-0 relative my-auto">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-[#282a36] bg-[#14151b] flex items-center justify-between">
+              <div className="flex items-center gap-2 truncate">
+                <ImageIcon className="w-4 h-4 text-[#0099dd]" />
+                <span className="text-xs font-bold text-white truncate">{activeMediaPreview.fileName || 'Preview Gambar'}</span>
+              </div>
+              <button
+                onClick={() => setActiveMediaPreview(null)}
+                className="p-1.5 rounded-xl bg-[#22242e] text-[#8e94a5] hover:text-white transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Full Image Display Container */}
+            <div className="p-4 sm:p-6 bg-black/60 flex items-center justify-center max-h-[75vh] overflow-auto">
+              <img
+                src={activeMediaPreview.url}
+                alt={activeMediaPreview.fileName || 'Preview'}
+                className="max-h-[70vh] w-auto max-w-full rounded-xl object-contain shadow-2xl border border-[#272935]"
+              />
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="p-4 border-t border-[#282a36] bg-[#14151b] flex items-center justify-between gap-3">
+              <a
+                href={activeMediaPreview.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 rounded-xl bg-[#20222d] hover:bg-[#2a2d3c] text-white text-xs font-semibold flex items-center gap-2 transition-all"
+              >
+                <Eye className="w-4 h-4 text-[#0099dd]" />
+                <span>Buka di Tab Baru</span>
+              </a>
+
+              <div className="flex items-center gap-2">
+                <a
+                  href={activeMediaPreview.url}
+                  download={activeMediaPreview.fileName || 'gambar_catatan'}
+                  className="px-5 py-2 rounded-xl bg-[#0099dd] hover:bg-[#0088cc] text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-cyan-900/30 transition-all cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Unduh Gambar</span>
+                </a>
+                <button
+                  onClick={() => setActiveMediaPreview(null)}
+                  className="btn-myits-secondary text-xs px-4 py-2"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
