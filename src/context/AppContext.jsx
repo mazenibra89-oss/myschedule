@@ -434,40 +434,72 @@ export function AppProvider({ children }) {
   useEffect(() => localStorage.setItem('myits_moods', JSON.stringify(moodLogs)), [moodLogs]);
   useEffect(() => localStorage.setItem('myits_finance', JSON.stringify(financeLogs)), [financeLogs]);
 
-  // Initial Sync from PostgreSQL API on Mount
+  // Centralized Real-time Auto-Sync Engine from PostgreSQL Database
+  const fetchAllDataFromDB = async () => {
+    try {
+      // 1. Sync Notes
+      const resNotes = await fetch('/api/notes');
+      if (resNotes.ok) {
+        const dataNotes = await resNotes.json();
+        if (dataNotes && dataNotes.success && Array.isArray(dataNotes.notes)) {
+          setNotes(dataNotes.notes);
+          localStorage.setItem('myits_notes', JSON.stringify(dataNotes.notes));
+        }
+      }
+
+      // 2. Sync Tasks
+      const resTasks = await fetch('/api/tasks');
+      if (resTasks.ok) {
+        const dataTasks = await resTasks.json();
+        if (dataTasks && dataTasks.success && Array.isArray(dataTasks.tasks)) {
+          setTasks(dataTasks.tasks);
+          localStorage.setItem('myits_tasks', JSON.stringify(dataTasks.tasks));
+        }
+      }
+
+      // 3. Sync Schedule Events
+      const resSchedules = await fetch('/api/schedules');
+      if (resSchedules.ok) {
+        const dataSchedules = await resSchedules.json();
+        if (dataSchedules && dataSchedules.success && Array.isArray(dataSchedules.events)) {
+          setScheduleEvents(dataSchedules.events);
+          localStorage.setItem('myits_events', JSON.stringify(dataSchedules.events));
+        }
+      }
+
+      // 4. Sync Courses
+      const resCourses = await fetch('/api/courses');
+      if (resCourses.ok) {
+        const dataCourses = await resCourses.json();
+        if (dataCourses && dataCourses.success && Array.isArray(dataCourses.courses)) {
+          setCourses(dataCourses.courses);
+          localStorage.setItem('myits_courses', JSON.stringify(dataCourses.courses));
+        }
+      }
+    } catch (err) {
+      console.warn('[Auto-Sync Notice]:', err.message);
+    }
+  };
+
+  // Mount, Tab-Focus & Periodic Background Auto-Sync Effect
   useEffect(() => {
-    // 1. Fetch Notes from PostgreSQL API
-    fetch('/api/notes')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data && data.success && Array.isArray(data.notes) && data.notes.length > 0) {
-          setNotes(data.notes);
-          localStorage.setItem('myits_notes', JSON.stringify(data.notes));
-        }
-      })
-      .catch((err) => console.warn('[Notes API Sync Notice]:', err.message));
+    // Initial Sync on Mount
+    fetchAllDataFromDB();
 
-    // 2. Fetch Tasks from PostgreSQL API
-    fetch('/api/tasks')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data && data.success && Array.isArray(data.tasks) && data.tasks.length > 0) {
-          setTasks(data.tasks);
-          localStorage.setItem('myits_tasks', JSON.stringify(data.tasks));
-        }
-      })
-      .catch((err) => console.warn('[Tasks API Sync Notice]:', err.message));
+    // Background Interval Sync (Every 6 seconds)
+    const interval = setInterval(fetchAllDataFromDB, 6000);
 
-    // 3. Fetch Schedule Events from PostgreSQL API
-    fetch('/api/schedules')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data && data.success && Array.isArray(data.events) && data.events.length > 0) {
-          setScheduleEvents(data.events);
-          localStorage.setItem('myits_events', JSON.stringify(data.events));
-        }
-      })
-      .catch((err) => console.warn('[Schedules API Sync Notice]:', err.message));
+    // Instant Sync when user switches back to this browser tab/window
+    const handleFocusSync = () => fetchAllDataFromDB();
+    window.addEventListener('focus', handleFocusSync);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') handleFocusSync();
+    });
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocusSync);
+    };
   }, []);
 
   // Global Keyboard Shortcut Cmd+K
@@ -641,21 +673,33 @@ export function AppProvider({ children }) {
       const courseId = item.rawId || item.originalCourse?.id;
       const extraIdx = item.extraIdx;
       if (courseId !== undefined && extraIdx !== undefined) {
+        let updatedCourse = null;
         setCourses((prev) =>
           prev.map((c) => {
             if (c.id === courseId) {
               const newExtras = [...(c.extraSchedules || [])];
               newExtras.splice(extraIdx, 1);
-              return { ...c, extraSchedules: newExtras };
+              updatedCourse = { ...c, extraSchedules: newExtras };
+              return updatedCourse;
             }
             return c;
           })
         );
+        if (updatedCourse) {
+          fetch('/api/courses/' + courseId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedCourse),
+          }).catch((err) => console.warn('[deleteScheduleItem course_extra API Notice]:', err.message));
+        }
       }
     } else if (item.itemType === 'course' || String(item.id).startsWith('course_')) {
       const courseId = item.rawId || item.originalCourse?.id;
       if (courseId) {
         setCourses((prev) => prev.filter((c) => c.id !== courseId));
+        fetch('/api/courses/' + courseId, { method: 'DELETE' }).catch((err) =>
+          console.warn('[deleteScheduleItem course API Notice]:', err.message)
+        );
       }
     }
   };
