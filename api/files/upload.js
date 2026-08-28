@@ -12,10 +12,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const filename = req.headers['x-filename'] || `file-${Date.now()}`;
+    const rawFilename = req.headers['x-filename'] || `file-${Date.now()}`;
+    const filename = decodeURIComponent(rawFilename);
     const contentType = req.headers['content-type'] || 'application/octet-stream';
 
-    // Upload stream langsung ke Vercel Blob
+    // Upload langsung data stream ke Vercel Blob
     const blob = await put(filename, req, {
       access: 'public',
       contentType,
