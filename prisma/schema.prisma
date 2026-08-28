@@ -1,0 +1,103 @@
+// Prisma Schema for PostgreSQL (Neon / Supabase / Vercel Postgres)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. File Metadata Table (Google Drive API Integration)
+model FileMetadata {
+  id             String   @id @default(uuid())
+  name           String
+  mime_type      String
+  file_size      Int
+  drive_file_id  String   @unique
+  drive_view_link String
+  created_at     DateTime @default(now())
+
+  @@map("files_metadata")
+}
+
+// 2. User Profile Table
+model UserProfile {
+  id         String   @id @default("default_user")
+  name       String
+  email      String   @unique
+  nrp        String
+  department String
+  semester   Int      @default(5)
+  ipk        Float    @default(3.84)
+  sksTaken   Int      @default(84)
+  avatar     String
+  updatedAt  DateTime @updatedAt
+
+  @@map("user_profiles")
+}
+
+// 3. Courses Table
+model Course {
+  id                  String   @id @default(uuid())
+  name                String
+  code                String
+  day                 String
+  time                String
+  room                String
+  color               String   @default("#0099dd")
+  sks                 Int      @default(3)
+  lecturer            String
+  extraSchedulesCount Int      @default(0)
+  extraSchedules      String[] @default([])
+  createdAt           DateTime @default(now())
+
+  @@map("courses")
+}
+
+// 4. Tasks Table
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  courseId    String   @default("general")
+  category    String   @default("Akademik")
+  priority    String   @default("Sedang")
+  status      String   @default("belum") // 'belum' | 'selesai'
+  dueDate     String
+  description String?
+  subtasks    Json     @default("[]")
+  createdAt   DateTime @default(now())
+
+  @@map("tasks")
+}
+
+// 5. Notes Table
+model Note {
+  id        String   @id @default(uuid())
+  title     String
+  category  String   @default("Kuliah")
+  parentId  String?
+  blocks    Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("notes")
+}
+
+// 6. Schedule Events Table
+model ScheduleEvent {
+  id          String   @id @default(uuid())
+  title       String
+  courseId    String?
+  date        String?
+  day         String?
+  time        String   @default("Fleksibel")
+  location    String   @default("Daring")
+  category    String   @default("Kegiatan")
+  color       String   @default("#10b981")
+  isRecurring Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@map("schedule_events")
+}

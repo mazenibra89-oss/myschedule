@@ -1,0 +1,749 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useApp } from '../../context/AppContext';
+import {
+  BookOpen,
+  Plus,
+  Trash2,
+  Bold,
+  Heading,
+  CheckSquare,
+  Sparkles,
+  CheckCircle2,
+  ChevronRight,
+  ChevronDown,
+  CornerDownRight,
+  Eye,
+  Copy,
+  Check,
+  Search,
+  Quote,
+  Paperclip,
+  FileText,
+  Download,
+  Image as ImageIcon
+} from 'lucide-react';
+
+export default function NotesWorkspace() {
+  const { notes, addNote, updateNote, deleteNote, courses } = useApp();
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState('Semua'); // 'Semua' | 'Akademik' | 'Non-Akademik'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedNoteId, setSelectedNoteId] = useState(notes[0]?.id || null);
+  const [activeNote, setActiveNote] = useState(notes[0] || null);
+  const [expandedParents, setExpandedParents] = useState({ note_c1: true, note_c2: true });
+  const [previewMode, setPreviewMode] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const fileInputRef = useRef(null);
+
+  // Sync activeNote with notes state
+  useEffect(() => {
+    if (selectedNoteId) {
+      const found = notes.find((n) => n.id === selectedNoteId);
+      if (found) {
+        setActiveNote(found);
+      }
+    }
+  }, [notes, selectedNoteId]);
+
+  const toggleExpandParent = (parentId, e) => {
+    e.stopPropagation();
+    setExpandedParents((prev) => ({
+      ...prev,
+      [parentId]: !prev[parentId]
+    }));
+  };
+
+  const handleSelectNote = (note) => {
+    setSelectedNoteId(note.id);
+    setActiveNote(note);
+  };
+
+  // Create a brand new Top-Level Note
+  const handleCreateTopNote = () => {
+    const newNote = {
+      title: 'Halaman Catatan Baru',
+      category: activeCategoryFilter === 'Non-Akademik' ? 'Non-Akademik' : 'Akademik',
+      iconType: 'book',
+      parentId: null,
+      blocks: [
+        { id: 'b_h1', type: 'h2', content: 'Judul Rangkuman Materi' },
+        { id: 'b_p1', type: 'text', content: 'Tuliskan catatan detail di sini...' }
+      ]
+    };
+    addNote(newNote);
+  };
+
+  // Create a Sub-Page (Halaman Turunan) under active note
+  const handleCreateSubPage = () => {
+    if (!activeNote) return;
+    const parentId = activeNote.parentId ? activeNote.parentId : activeNote.id;
+
+    const newSubNote = {
+      title: 'Halaman Turunan Baru',
+      category: activeNote.category || 'Akademik',
+      iconType: 'file',
+      parentId: parentId,
+      blocks: [
+        { id: 'b_sub_h1', type: 'h2', content: `Sub-Halaman dari ${activeNote.title}` },
+        { id: 'b_sub_p1', type: 'text', content: 'Tuliskan catatan detail sub-halaman di sini...' }
+      ]
+    };
+    addNote(newSubNote);
+    setExpandedParents((prev) => ({ ...prev, [parentId]: true }));
+  };
+
+  // Block manipulation helpers
+  const handleAddBlock = (type) => {
+    if (!activeNote) return;
+    let newBlock = { id: 'b_' + Date.now(), type, content: '' };
+    if (type === 'h1') newBlock.content = 'Judul Utama Baru';
+    if (type === 'h2') newBlock.content = 'Sub-Judul Baru';
+    if (type === 'h3') newBlock.content = 'Poin Bahasan';
+    if (type === 'text') newBlock.content = 'Ketik paragraf materi baru di sini...';
+    if (type === 'todo') {
+      newBlock.content = 'Tugas checklist...';
+      newBlock.checked = false;
+    }
+    if (type === 'callout') newBlock.content = 'Catatan Dosen / Formula Penting';
+
+    const updated = {
+      ...activeNote,
+      blocks: [...(activeNote.blocks || []), newBlock]
+    };
+    setActiveNote(updated);
+    updateNote(updated);
+  };
+
+  // File Attachment Upload Handler (Google Drive Storage + PostgreSQL Metadata API)
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeNote) return;
+
+    const isImage = file.type.startsWith('image/');
+    const formattedSize = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+
+    try {
+      // 1. Prepare FormData for API Route /api/files/upload
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/files/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.file) {
+          const fileBlock = {
+            id: 'b_file_' + Date.now(),
+            type: isImage ? 'image' : 'file',
+            fileName: data.file.name || file.name,
+            fileSize: formattedSize,
+            fileType: file.type,
+            url: data.file.drive_view_link,
+            driveFileId: data.file.drive_file_id,
+            driveViewLink: data.file.drive_view_link,
+            content: data.file.name || file.name
+          };
+
+          const updated = {
+            ...activeNote,
+            blocks: [...(activeNote.blocks || []), fileBlock]
+          };
+          setActiveNote(updated);
+          updateNote(updated);
+          e.target.value = '';
+          return;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[Upload API Notice] Falling back to local data URL mode:', apiErr.message);
+    }
+
+    // Local Fallback if API route is not running locally
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      const fileDataUrl = uploadEvent.target?.result;
+      const fileBlock = {
+        id: 'b_file_' + Date.now(),
+        type: isImage ? 'image' : 'file',
+        fileName: file.name,
+        fileSize: formattedSize,
+        fileType: file.type,
+        url: fileDataUrl,
+        content: file.name
+      };
+
+      const updated = {
+        ...activeNote,
+        blocks: [...(activeNote.blocks || []), fileBlock]
+      };
+      setActiveNote(updated);
+      updateNote(updated);
+    };
+
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleUpdateBlockContent = (blockId, newContent) => {
+    if (!activeNote) return;
+    const updatedBlocks = activeNote.blocks.map((b) => (b.id === blockId ? { ...b, content: newContent } : b));
+    const updated = { ...activeNote, blocks: updatedBlocks };
+    setActiveNote(updated);
+    updateNote(updated);
+  };
+
+  // Delete Block Helper (Removes specific block, image, or file attachment)
+  const handleDeleteBlock = (blockId) => {
+    if (!activeNote) return;
+    const updatedBlocks = activeNote.blocks.filter((b) => b.id !== blockId);
+    const updated = { ...activeNote, blocks: updatedBlocks };
+    setActiveNote(updated);
+    updateNote(updated);
+  };
+
+  const toggleTodoBlock = (blockId) => {
+    if (!activeNote) return;
+    const updatedBlocks = activeNote.blocks.map((b) => (b.id === blockId ? { ...b, checked: !b.checked } : b));
+    const updated = { ...activeNote, blocks: updatedBlocks };
+    setActiveNote(updated);
+    updateNote(updated);
+  };
+
+  const handleCopyNoteContent = () => {
+    if (!activeNote) return;
+    const textContent = activeNote.blocks.map((b) => b.content).join('\n\n');
+    navigator.clipboard.writeText(`${activeNote.title}\n\n${textContent}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // Filter notes by Category & Search query
+  const filteredNotes = notes.filter((n) => {
+    const matchesSearch = n.title.toLowerCase().includes(searchQuery.toLowerCase());
+    if (activeCategoryFilter === 'Semua') return matchesSearch;
+    return matchesSearch && n.category === activeCategoryFilter;
+  });
+
+  // Top level parent notes (parentId === null)
+  const parentNotes = filteredNotes.filter((n) => !n.parentId);
+
+  // Compute Word Count for Active Note
+  const computeWordCount = () => {
+    if (!activeNote || !activeNote.blocks) return 0;
+    const text = activeNote.blocks.map((b) => b.content || '').join(' ');
+    return text.trim() ? text.trim().split(/\s+/).length : 0;
+  };
+
+  // Breadcrumb path computation
+  const getBreadcrumbs = () => {
+    if (!activeNote) return [];
+    const crumbs = [];
+    if (activeNote.category) crumbs.push(activeNote.category);
+
+    if (activeNote.parentId) {
+      const parent = notes.find((n) => n.id === activeNote.parentId);
+      if (parent) crumbs.push(parent.title);
+    }
+    crumbs.push(activeNote.title);
+    return crumbs;
+  };
+
+  return (
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-fade-in">
+      {/* Hidden File Input for Attachments */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.zip,.txt"
+        className="hidden"
+        onChange={handleFileUpload}
+      />
+
+      {/* Top Bar Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2.5">
+            <BookOpen className="w-5 h-5 text-emerald-400" />
+            Catatan
+          </h1>
+          <p className="text-xs text-[#8a90a2] mt-0.5">
+            Kelola dokumen perkuliahan, sisipkan berkas/gambar, dan buat struktur bertingkat (Sub-Pages).
+          </p>
+        </div>
+      </div>
+
+      {/* Main Grid: Left Tree Navigation & Right Note Editor */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 min-h-[640px]">
+        {/* Left Side: Tree Navigation (Catatan Sidebar) */}
+        <div className="card-myits p-4 bg-[#1a1b22] border-[#292b37] space-y-4 flex flex-col justify-between">
+          <div className="space-y-3">
+            {/* Header Title & Add Page Button BELOW Title */}
+            <div className="space-y-2 border-b border-[#262835] pb-3">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-emerald-400" />
+                Catatan
+              </h2>
+              <button
+                onClick={handleCreateTopNote}
+                className="w-full px-3 py-2 rounded-xl bg-[#0099dd] hover:bg-[#0088cc] text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-cyan-900/20 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Halaman Baru</span>
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-[#73798c] absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Cari dalam catatan..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 rounded-xl bg-[#131419] border border-[#2a2c38] text-white text-xs focus:outline-none focus:border-[#0099dd]"
+              />
+            </div>
+
+            {/* Filter Category Select (ONLY Akademik & Non-Akademik) */}
+            <div>
+              <select
+                value={activeCategoryFilter}
+                onChange={(e) => setActiveCategoryFilter(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-[#131419] border border-[#2a2c38] text-white text-xs font-semibold focus:outline-none"
+              >
+                <option value="Semua">Semua Kategori ({notes.length})</option>
+                <option value="Akademik">Akademik ({notes.filter((n) => n.category === 'Akademik').length})</option>
+                <option value="Non-Akademik">Non-Akademik ({notes.filter((n) => n.category === 'Non-Akademik').length})</option>
+              </select>
+            </div>
+
+            {/* Document Tree Navigation List */}
+            <div className="space-y-1 overflow-y-auto max-h-[460px] pt-1 pr-1">
+              {parentNotes.map((parent) => {
+                const childNotes = notes.filter((n) => n.parentId === parent.id);
+                const hasChildren = childNotes.length > 0;
+                const isExpanded = expandedParents[parent.id];
+                const isSelected = selectedNoteId === parent.id;
+
+                return (
+                  <div key={parent.id} className="space-y-1">
+                    {/* Parent Note Row */}
+                    <div
+                      onClick={() => handleSelectNote(parent)}
+                      className={`p-2.5 rounded-xl cursor-pointer flex items-center justify-between group transition-all text-xs ${
+                        isSelected
+                          ? 'bg-[#00425a] text-white font-bold border-l-4 border-[#0099dd]'
+                          : 'hover:bg-[#222430] text-[#9ea4b5]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate min-w-0">
+                        {hasChildren ? (
+                          <button
+                            onClick={(e) => toggleExpandParent(parent.id, e)}
+                            className="p-0.5 hover:text-white text-[#73798c]"
+                          >
+                            {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                          </button>
+                        ) : (
+                          <div className="w-3.5" />
+                        )}
+
+                        <div className="w-5 h-5 rounded bg-[#20222d] flex items-center justify-center shrink-0 text-emerald-400 font-bold">
+                          <BookOpen className="w-3.5 h-3.5" />
+                        </div>
+
+                        <span className="truncate">{parent.title}</span>
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteNote(parent.id);
+                        }}
+                        className="text-[#646a7c] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-1"
+                        title="Hapus Halaman Ini"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Sub-Pages / Child Notes List (Nested Hierarchy) */}
+                    {hasChildren && isExpanded && (
+                      <div className="ml-5 pl-2 border-l border-[#282a36] space-y-1">
+                        {childNotes.map((child) => {
+                          const isChildSelected = selectedNoteId === child.id;
+
+                          return (
+                            <div
+                              key={child.id}
+                              onClick={() => handleSelectNote(child)}
+                              className={`p-2 rounded-lg cursor-pointer flex items-center justify-between text-xs group transition-all ${
+                                isChildSelected
+                                  ? 'bg-[#00425a]/80 text-[#38bdf8] font-bold border-l-2 border-[#0099dd]'
+                                  : 'hover:bg-[#20222d] text-[#8e94a6]'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <CornerDownRight className="w-3 h-3 text-[#646a7c] shrink-0" />
+                                <span className="truncate">{child.title}</span>
+                              </div>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteNote(child.id);
+                                }}
+                                className="text-[#646a7c] hover:text-red-400 opacity-0 group-hover:opacity-100 p-1"
+                                title="Hapus Sub-Halaman"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side: Note Editor Workspace */}
+        <div className="md:col-span-3 card-myits p-6 bg-[#1a1b22] border-[#292b37] flex flex-col justify-between space-y-6">
+          {activeNote ? (
+            <div className="space-y-6 flex-1 flex flex-col justify-between">
+              <div className="space-y-6">
+                {/* Editor Header Row: Breadcrumbs & Action Buttons */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#282a37] pb-4">
+                  {/* Breadcrumb Path */}
+                  <div className="flex items-center gap-1.5 text-xs text-[#878d9f] font-medium truncate">
+                    {getBreadcrumbs().map((crumb, idx) => (
+                      <React.Fragment key={idx}>
+                        {idx > 0 && <span className="text-[#525768]">/</span>}
+                        <span className={idx === getBreadcrumbs().length - 1 ? 'text-white font-bold' : ''}>
+                          {crumb}
+                        </span>
+                      </React.Fragment>
+                    ))}
+                  </div>
+
+                  {/* Top Action Buttons (Preview Mode, Copy, + Sub-Page) */}
+                  <div className="flex items-center gap-2 self-start sm:self-center">
+                    <button
+                      onClick={() => setPreviewMode(!previewMode)}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                        previewMode
+                          ? 'bg-[#0099dd] text-white border-[#0099dd]'
+                          : 'bg-[#20222d] hover:bg-[#282b3a] text-[#a0a6b7] border-[#2e3142]'
+                      }`}
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>{previewMode ? 'Edit Mode' : 'Preview Mode'}</span>
+                    </button>
+
+                    <button
+                      onClick={handleCopyNoteContent}
+                      className="p-2 rounded-xl bg-[#20222d] hover:bg-[#282b3a] text-[#a0a6b7] hover:text-white border border-[#2e3142] transition-all"
+                      title="Salin Teks Catatan"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+
+                    <button
+                      onClick={handleCreateSubPage}
+                      className="px-3 py-1.5 rounded-xl bg-[#232533] hover:bg-[#2c2f42] text-white border border-[#35384d] text-xs font-bold flex items-center gap-1.5 transition-all"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-[#0099dd]" />
+                      <span>+ Sub-Page</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Document Title Input */}
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-[#20222d] border border-[#2e3142] flex items-center justify-center text-emerald-400 shrink-0">
+                    <BookOpen className="w-5 h-5" />
+                  </div>
+                  <input
+                    type="text"
+                    value={activeNote.title}
+                    onChange={(e) => {
+                      const updated = { ...activeNote, title: e.target.value };
+                      setActiveNote(updated);
+                      updateNote(updated);
+                    }}
+                    className="w-full text-2xl font-extrabold text-white bg-transparent focus:outline-none tracking-tight"
+                    placeholder="Judul Catatan..."
+                  />
+                </div>
+
+                {/* Formatting Toolbar (Includes + File Attachment Button) */}
+                {!previewMode && (
+                  <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-[#14151a] border border-[#272936] text-xs text-[#878d9f]">
+                    <button
+                      onClick={() => handleAddBlock('h1')}
+                      className="px-2.5 py-1 rounded bg-[#20222d] hover:bg-[#292c3a] text-white font-bold"
+                    >
+                      + H1
+                    </button>
+                    <button
+                      onClick={() => handleAddBlock('h2')}
+                      className="px-2.5 py-1 rounded bg-[#20222d] hover:bg-[#292c3a] text-white font-bold"
+                    >
+                      + H2
+                    </button>
+                    <button
+                      onClick={() => handleAddBlock('h3')}
+                      className="px-2.5 py-1 rounded bg-[#20222d] hover:bg-[#292c3a] text-white font-bold"
+                    >
+                      + H3
+                    </button>
+                    <span className="w-px h-4 bg-[#2a2c3a] mx-1"></span>
+                    <button
+                      onClick={() => handleAddBlock('text')}
+                      className="px-2.5 py-1 rounded bg-[#20222d] hover:bg-[#292c3a] text-white flex items-center gap-1"
+                    >
+                      <Bold className="w-3 h-3" /> + Teks
+                    </button>
+                    <button
+                      onClick={() => handleAddBlock('todo')}
+                      className="px-2.5 py-1 rounded bg-[#20222d] hover:bg-[#292c3a] text-white flex items-center gap-1"
+                    >
+                      <CheckSquare className="w-3 h-3 text-emerald-400" /> + Checklist
+                    </button>
+                    <button
+                      onClick={() => handleAddBlock('callout')}
+                      className="px-2.5 py-1 rounded bg-[#20222d] hover:bg-[#292c3a] text-white flex items-center gap-1"
+                    >
+                      <Quote className="w-3 h-3 text-[#0099dd]" /> + Callout
+                    </button>
+
+                    {/* + File Attachment Button (Images, PDF, Docs) */}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-2.5 py-1 rounded bg-[#20222d] hover:bg-[#0099dd]/30 text-[#38bdf8] flex items-center gap-1.5 font-bold transition-all border border-[#0099dd]/30"
+                    >
+                      <Paperclip className="w-3.5 h-3.5" />
+                      <span>+ Sisipkan File / Gambar</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Blocks Content Area (Supports Image & File Attachments) */}
+                <div className="space-y-4 pt-2">
+                  {(activeNote.blocks || []).map((block) => {
+                    if (previewMode) {
+                      return (
+                        <div key={block.id} className="text-xs text-[#d6dae6] leading-relaxed">
+                          {block.type === 'h1' && <h2 className="text-lg font-bold text-white mt-4 border-b border-[#282a36] pb-1">{block.content}</h2>}
+                          {block.type === 'h2' && <h3 className="text-base font-bold text-white mt-4 border-b border-[#282a36] pb-1">{block.content}</h3>}
+                          {block.type === 'h3' && <h4 className="text-sm font-bold text-white mt-3">{block.content}</h4>}
+                          {block.type === 'text' && <p className="py-1">{block.content}</p>}
+                          {block.type === 'callout' && (
+                            <div className="p-3.5 rounded-xl bg-[#0099dd]/10 border border-[#0099dd]/30 text-[#e1f2fe] flex items-start gap-3">
+                              <Sparkles className="w-4 h-4 text-[#0099dd] shrink-0 mt-0.5" />
+                              <span>{block.content}</span>
+                            </div>
+                          )}
+                          {block.type === 'todo' && (
+                            <div className="flex items-center gap-2 text-xs py-0.5">
+                              <span className={block.checked ? 'line-through text-[#646a7c]' : 'text-white'}>
+                                [{block.checked ? 'x' : ' '}] {block.content}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Image Attachment Preview */}
+                          {block.type === 'image' && (
+                            <div className="space-y-2 p-3 rounded-2xl bg-[#14151a] border border-[#272935]">
+                              <img
+                                src={block.url}
+                                alt={block.fileName || 'Gambar'}
+                                className="max-h-96 max-w-full rounded-xl object-contain bg-black/40 border border-[#262835]"
+                              />
+                              {block.content && <p className="text-[11px] text-[#878d9f] italic">{block.content}</p>}
+                            </div>
+                          )}
+
+                          {/* File Attachment Card */}
+                          {block.type === 'file' && (
+                            <div className="p-4 rounded-2xl bg-[#14151a] border border-[#272935] flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-xl bg-[#20222d] border border-[#2a2c3a] flex items-center justify-center text-[#0099dd] shrink-0">
+                                  <FileText className="w-5 h-5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-white truncate">{block.fileName || block.content}</p>
+                                  <p className="text-[10px] text-[#787e91]">{block.fileSize || 'Dokumen'}</p>
+                                </div>
+                              </div>
+                              <a
+                                href={block.url}
+                                download={block.fileName || 'file_catatan'}
+                                className="px-3 py-1.5 rounded-xl bg-[#20222d] hover:bg-[#0099dd] hover:text-white text-[#38bdf8] text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                <span>Unduh File</span>
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={block.id} className="group/block flex items-start gap-2 relative">
+                        {/* Main Block Content */}
+                        <div className="flex-1">
+                          {block.type === 'h1' && (
+                            <input
+                              type="text"
+                              value={block.content}
+                              onChange={(e) => handleUpdateBlockContent(block.id, e.target.value)}
+                              className="w-full text-lg font-bold text-white bg-transparent focus:outline-none border-b border-[#282a36] pb-1 mt-2"
+                              placeholder="Judul Utama H1..."
+                            />
+                          )}
+                          {block.type === 'h2' && (
+                            <input
+                              type="text"
+                              value={block.content}
+                              onChange={(e) => handleUpdateBlockContent(block.id, e.target.value)}
+                              className="w-full text-base font-bold text-white bg-transparent focus:outline-none border-b border-[#282a36] pb-1 mt-2"
+                              placeholder="Sub-Judul H2..."
+                            />
+                          )}
+                          {block.type === 'h3' && (
+                            <input
+                              type="text"
+                              value={block.content}
+                              onChange={(e) => handleUpdateBlockContent(block.id, e.target.value)}
+                              className="w-full text-sm font-bold text-white bg-transparent focus:outline-none border-b border-[#282a36] pb-1 mt-1"
+                              placeholder="Poin Bahasan H3..."
+                            />
+                          )}
+                          {block.type === 'text' && (
+                            <textarea
+                              value={block.content}
+                              onChange={(e) => handleUpdateBlockContent(block.id, e.target.value)}
+                              rows={2}
+                              className="w-full text-xs text-[#d6dae6] bg-[#14151a] p-3 rounded-xl border border-[#262835] focus:outline-none focus:border-[#0099dd] leading-relaxed"
+                              placeholder="Paragraf catatan..."
+                            />
+                          )}
+                          {block.type === 'callout' && (
+                            <div className="p-3.5 rounded-xl bg-[#0099dd]/10 border border-[#0099dd]/30 text-xs text-[#e1f2fe] flex items-start gap-3">
+                              <Sparkles className="w-4 h-4 text-[#0099dd] shrink-0 mt-0.5" />
+                              <input
+                                type="text"
+                                value={block.content}
+                                onChange={(e) => handleUpdateBlockContent(block.id, e.target.value)}
+                                className="w-full bg-transparent text-xs text-white focus:outline-none"
+                                placeholder="Callout / Poin penting..."
+                              />
+                            </div>
+                          )}
+                          {block.type === 'todo' && (
+                            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-[#14151a] border border-[#262835]">
+                              <div
+                                onClick={() => toggleTodoBlock(block.id)}
+                                className={`w-4 h-4 rounded flex items-center justify-center border cursor-pointer ${
+                                  block.checked ? 'bg-emerald-500 border-emerald-400 text-white' : 'border-[#3a3d4f]'
+                                }`}
+                              >
+                                {block.checked && <CheckCircle2 className="w-3 h-3" />}
+                              </div>
+                              <input
+                                type="text"
+                                value={block.content}
+                                onChange={(e) => handleUpdateBlockContent(block.id, e.target.value)}
+                                className={`w-full bg-transparent text-xs focus:outline-none ${
+                                  block.checked ? 'line-through text-[#646a7c]' : 'text-white font-medium'
+                                }`}
+                                placeholder="Item checklist..."
+                              />
+                            </div>
+                          )}
+
+                          {/* Image Attachment Block */}
+                          {block.type === 'image' && (
+                            <div className="space-y-2 p-3 rounded-2xl bg-[#14151a] border border-[#272935]">
+                              <div className="flex items-center justify-between text-[11px] text-[#878d9f]">
+                                <span className="flex items-center gap-1.5 text-[#38bdf8] font-semibold">
+                                  <ImageIcon className="w-3.5 h-3.5" /> Gambar Sisipan: {block.fileName}
+                                </span>
+                                <span>{block.fileSize}</span>
+                              </div>
+                              <img
+                                src={block.url}
+                                alt={block.fileName || 'Gambar'}
+                                className="max-h-96 max-w-full rounded-xl object-contain bg-black/40 border border-[#262835]"
+                              />
+                              <input
+                                type="text"
+                                value={block.content}
+                                onChange={(e) => handleUpdateBlockContent(block.id, e.target.value)}
+                                placeholder="Tuliskan keterangan/caption gambar di sini..."
+                                className="w-full bg-[#1b1c24] px-3 py-1.5 rounded-lg text-xs text-white border border-[#282a36] focus:outline-none focus:border-[#0099dd]"
+                              />
+                            </div>
+                          )}
+
+                          {/* File Attachment Card Block */}
+                          {block.type === 'file' && (
+                            <div className="p-4 rounded-2xl bg-[#14151a] border border-[#272935] flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-xl bg-[#20222d] border border-[#2a2c3a] flex items-center justify-center text-[#0099dd] shrink-0">
+                                  <FileText className="w-5 h-5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-white truncate">{block.fileName || block.content}</p>
+                                  <p className="text-[10px] text-[#787e91]">{block.fileSize || 'Dokumen'}</p>
+                                </div>
+                              </div>
+                              <a
+                                href={block.url}
+                                download={block.fileName || 'file_catatan'}
+                                className="px-3 py-1.5 rounded-xl bg-[#20222d] hover:bg-[#0099dd] hover:text-white text-[#38bdf8] text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                <span>Unduh File</span>
+                              </a>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Delete Block Trash Icon Button */}
+                        <button
+                          onClick={() => handleDeleteBlock(block.id)}
+                          className="p-1.5 rounded-lg bg-[#20222d] text-[#646a7c] hover:text-red-400 hover:bg-[#282b3a] transition-all opacity-0 group-hover/block:opacity-100 shrink-0 mt-1"
+                          title="Hapus Blok Ini"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Bottom Footer Bar */}
+              <div className="pt-4 border-t border-[#262835] flex items-center justify-between text-[11px] text-[#73798c]">
+                <span>Terakhir diperbarui: {activeNote.updatedAt || 'Jumat, 28 Agustus 2026'}</span>
+                <span>{computeWordCount()} kata</span>
+              </div>
+            </div>
+          ) : (
+            <div className="p-12 text-center text-[#73798c] text-xs">Pilih dokumen di panel sebelah kiri.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
