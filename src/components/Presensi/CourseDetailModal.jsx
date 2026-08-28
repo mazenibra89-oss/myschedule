@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 
 export default function CourseDetailModal() {
-  const { selectedCourseDetail, setSelectedCourseDetail, deleteScheduleEvent } = useApp();
+  const { selectedCourseDetail, setSelectedCourseDetail, deleteScheduleItem } = useApp();
 
   if (!selectedCourseDetail) return null;
 
@@ -21,9 +21,8 @@ export default function CourseDetailModal() {
   const handleClose = () => setSelectedCourseDetail(null);
 
   const handleDelete = () => {
-    if (item.id) {
-      const targetId = item.eventId || String(item.id).replace(/^event_/, '');
-      deleteScheduleEvent(targetId);
+    if (item) {
+      deleteScheduleItem(item);
     }
     handleClose();
   };

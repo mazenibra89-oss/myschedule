@@ -630,6 +630,36 @@ export function AppProvider({ children }) {
     );
   };
 
+  const deleteScheduleItem = (item) => {
+    if (!item) return;
+
+    if (item.itemType === 'event' || String(item.id).startsWith('event_') || !item.originalCourse) {
+      const targetId = item.rawId || String(item.id).replace(/^event_/, '');
+      deleteScheduleEvent(targetId);
+      deleteScheduleEvent(item.id);
+    } else if (item.itemType === 'course_extra' || String(item.id).startsWith('course_extra_')) {
+      const courseId = item.rawId || item.originalCourse?.id;
+      const extraIdx = item.extraIdx;
+      if (courseId !== undefined && extraIdx !== undefined) {
+        setCourses((prev) =>
+          prev.map((c) => {
+            if (c.id === courseId) {
+              const newExtras = [...(c.extraSchedules || [])];
+              newExtras.splice(extraIdx, 1);
+              return { ...c, extraSchedules: newExtras };
+            }
+            return c;
+          })
+        );
+      }
+    } else if (item.itemType === 'course' || String(item.id).startsWith('course_')) {
+      const courseId = item.rawId || item.originalCourse?.id;
+      if (courseId) {
+        setCourses((prev) => prev.filter((c) => c.id !== courseId));
+      }
+    }
+  };
+
   const addNote = async (newNote) => {
     const noteObj = {
       id: 'n_' + Date.now(),
@@ -809,6 +839,7 @@ export function AppProvider({ children }) {
         addSubtask,
         addScheduleEvent,
         deleteScheduleEvent,
+        deleteScheduleItem,
         addNote,
         updateNote,
         deleteNote,
@@ -835,6 +866,8 @@ export const getCombinedSchedules = (courses = [], scheduleEvents = []) => {
   courses.forEach((c) => {
     combined.push({
       id: 'course_' + c.id,
+      rawId: c.id,
+      itemType: 'course',
       title: c.name,
       code: c.code || '',
       day: c.day,
@@ -873,6 +906,9 @@ export const getCombinedSchedules = (courses = [], scheduleEvents = []) => {
 
         combined.push({
           id: `course_extra_${c.id}_${idx}`,
+          rawId: c.id,
+          extraIdx: idx,
+          itemType: 'course_extra',
           title: `${c.name} (Praktikum/Tambahan)`,
           code: c.code || '',
           day: extraDay,
@@ -903,6 +939,8 @@ export const getCombinedSchedules = (courses = [], scheduleEvents = []) => {
 
     combined.push({
       id: 'event_' + e.id,
+      rawId: e.id,
+      itemType: 'event',
       title: e.title,
       code: '',
       day: computedDay,
