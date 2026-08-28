@@ -14,7 +14,10 @@ export function getDriveClient() {
     throw new Error('Google Drive API credentials missing in environment variables (GOOGLE_CLIENT_EMAIL / GOOGLE_PRIVATE_KEY).');
   }
 
-  // Handle line breaks in environment variables
+  // Handle line breaks and quotes in environment variables
+  if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+    privateKey = privateKey.slice(1, -1);
+  }
   if (privateKey.includes('\\n')) {
     privateKey = privateKey.replace(/\\n/g, '\n');
   }
@@ -33,7 +36,7 @@ export function getDriveClient() {
  */
 function bufferToStream(buffer) {
   const readable = new Readable();
-  readable._read = () => {};
+  readable._read = () => { };
   readable.push(buffer);
   readable.push(null);
   return readable;
@@ -53,17 +56,19 @@ export async function uploadFileToDrive({ buffer, fileName, mimeType }) {
   const drive = getDriveClient();
   let folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
 
-  if (folderId) {
-    folderId = folderId.trim();
-    if (folderId.includes('/folders/')) {
-      const match = folderId.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-      if (match) folderId = match[1];
-    }
+  if (!folderId) {
+    throw new Error('GOOGLE_DRIVE_FOLDER_ID is missing in environment variables. Service account cannot upload without a destination folder.');
+  }
+
+  folderId = folderId.trim();
+  if (folderId.includes('/folders/')) {
+    const match = folderId.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+    if (match) folderId = match[1];
   }
 
   const fileMetadata = {
     name: fileName,
-    parents: folderId ? [folderId] : [],
+    parents: [folderId],
   };
 
   const media = {
@@ -71,11 +76,12 @@ export async function uploadFileToDrive({ buffer, fileName, mimeType }) {
     body: bufferToStream(buffer),
   };
 
-  // 1. Upload File
+  // 1. Upload File with supportsAllDrives enabled
   const fileRes = await drive.files.create({
     requestBody: fileMetadata,
     media: media,
     fields: 'id, name, mimeType, webViewLink, webContentLink',
+    supportsAllDrives: true,
   });
 
   const driveFileId = fileRes.data.id;
@@ -90,6 +96,7 @@ export async function uploadFileToDrive({ buffer, fileName, mimeType }) {
         role: 'reader',
         type: 'anyone',
       },
+      supportsAllDrives: true,
     });
   } catch (permError) {
     console.warn(`[GoogleDrive] Permission setting warning for file ${driveFileId}:`, permError.message);
@@ -109,7 +116,10 @@ export async function uploadFileToDrive({ buffer, fileName, mimeType }) {
 export async function deleteFileFromDrive(driveFileId) {
   if (!driveFileId) return;
   const drive = getDriveClient();
-  await drive.files.delete({ fileId: driveFileId });
+  await drive.files.delete({
+    fileId: driveFileId,
+    supportsAllDrives: true,
+  });
 }
 
 /**
@@ -121,6 +131,7 @@ export async function getDriveFileMetadata(driveFileId) {
   const response = await drive.files.get({
     fileId: driveFileId,
     fields: 'id, name, mimeType, size, webViewLink, webContentLink',
+    supportsAllDrives: true,
   });
   return response.data;
 }
