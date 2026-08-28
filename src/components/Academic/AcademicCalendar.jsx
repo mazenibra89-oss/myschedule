@@ -294,21 +294,21 @@ export default function AcademicCalendar() {
 
       {/* Add Schedule Modal Dialog (Fixed Viewport Center Overlay) */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in my-auto">
-          <div className="card-myits bg-[#1b1c23] border-[#2c2e3b] w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl space-y-0 relative">
-            <div className="p-5 border-b border-[#282a36] flex items-center justify-between bg-[#17181f]">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-sm animate-fade-in overflow-y-auto my-auto">
+          <div className="card-myits bg-[#1b1c23] border-[#2c2e3b] w-full max-w-xl sm:max-w-2xl rounded-2xl overflow-hidden shadow-2xl space-y-0 relative my-auto">
+            <div className="p-4 sm:p-5 border-b border-[#282a36] flex items-center justify-between bg-[#17181f]">
+              <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                 <Plus className="w-4 h-4 text-[#0099dd]" /> Tambah Jadwal Kuliah / Kegiatan Baru
               </h3>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-1.5 rounded-lg bg-[#22242e] text-[#8e94a5] hover:text-white"
+                className="p-1.5 rounded-lg bg-[#22242e] text-[#8e94a5] hover:text-white shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveSchedule} className="p-6 space-y-4 max-h-[78vh] overflow-y-auto">
+            <form onSubmit={handleSaveSchedule} className="p-4 sm:p-6 space-y-4 max-h-[78vh] overflow-y-auto">
               <div>
                 <label className="text-[11px] text-[#878d9f] font-semibold block mb-1">
                   Judul Jadwal / Mata Kuliah *

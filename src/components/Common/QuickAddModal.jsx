@@ -47,10 +47,10 @@ export default function QuickAddModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-      <div className="card-myits bg-[#1b1c24] border-[#2d2f3e] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl space-y-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-sm animate-fade-in overflow-y-auto my-auto">
+      <div className="card-myits bg-[#1b1c24] border-[#2d2f3e] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl space-y-0 relative my-auto">
         {/* Header */}
-        <div className="p-5 border-b border-[#282a36] bg-[#16171d] flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-[#282a36] bg-[#16171d] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Plus className="w-5 h-5 text-[#0099dd]" />
             <h3 className="text-base font-bold text-white">Quick Add Entry</h3>
@@ -64,7 +64,7 @@ export default function QuickAddModal() {
         </div>
 
         {/* Type Toggle Tabs */}
-        <div className="p-4 bg-[#14151a] border-b border-[#272935] flex gap-3">
+        <div className="p-3 sm:p-4 bg-[#14151a] border-b border-[#272935] flex gap-3">
           <button
             onClick={() => setAddType('task')}
             className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all ${
@@ -91,7 +91,7 @@ export default function QuickAddModal() {
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 max-h-[78vh] overflow-y-auto">
           <div>
             <label className="text-xs font-semibold text-[#82889a] block mb-1">
               Judul {addType === 'task' ? 'Tugas' : 'Catatan'}

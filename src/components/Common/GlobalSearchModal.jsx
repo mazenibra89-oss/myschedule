@@ -32,8 +32,8 @@ export default function GlobalSearchModal() {
   const filteredDatabases = databases.filter((db) => db.title.toLowerCase().includes(q));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-      <div className="card-myits bg-[#1b1c24] border-[#2d2f3e] w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl space-y-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-sm animate-fade-in overflow-y-auto my-auto">
+      <div className="card-myits bg-[#1b1c24] border-[#2d2f3e] w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl space-y-0 relative my-auto">
         {/* Search Input */}
         <div className="p-4 border-b border-[#282a36] bg-[#16171d] flex items-center gap-3">
           <Search className="w-5 h-5 text-[#0099dd]" />

@@ -28,12 +28,12 @@ export default function CourseDetailModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-      <div className="card-myits bg-[#1b1c23] border-[#2c2e3b] w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl space-y-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-sm animate-fade-in overflow-y-auto my-auto">
+      <div className="card-myits bg-[#1b1c23] border-[#2c2e3b] w-full max-w-xl sm:max-w-2xl rounded-2xl overflow-hidden shadow-2xl space-y-0 relative my-auto">
         {/* Header Bar */}
-        <div className="p-6 border-b border-[#282a36] flex items-start justify-between bg-[#17181f]">
+        <div className="p-4 sm:p-6 border-b border-[#282a36] flex items-start justify-between bg-[#17181f]">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-[#222430] text-[#a0a6b7]">
                 {item.category || 'Akademik'}
               </span>
@@ -46,18 +46,18 @@ export default function CourseDetailModal() {
                 <span className="text-xs text-[#828899] font-medium">{item.sks} SKS</span>
               )}
             </div>
-            <h2 className="text-xl font-bold text-white mt-1.5">{item.title || item.name}</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-white mt-1.5">{item.title || item.name}</h2>
           </div>
           <button
             onClick={handleClose}
-            className="p-2 rounded-xl bg-[#22242e] hover:bg-[#2c2f3d] text-[#8e94a5] hover:text-white transition-all"
+            className="p-2 rounded-xl bg-[#22242e] hover:bg-[#2c2f3d] text-[#8e94a5] hover:text-white transition-all shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 max-h-[75vh] overflow-y-auto">
           {/* Information Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-4 rounded-xl bg-[#16171d] border border-[#272935] space-y-1">
