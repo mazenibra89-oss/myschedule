@@ -434,6 +434,31 @@ export function AppProvider({ children }) {
   useEffect(() => localStorage.setItem('myits_moods', JSON.stringify(moodLogs)), [moodLogs]);
   useEffect(() => localStorage.setItem('myits_finance', JSON.stringify(financeLogs)), [financeLogs]);
 
+  // Initial Sync from PostgreSQL API on Mount
+  useEffect(() => {
+    // 1. Fetch Notes from PostgreSQL API
+    fetch('/api/notes')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.success && Array.isArray(data.notes) && data.notes.length > 0) {
+          setNotes(data.notes);
+          localStorage.setItem('myits_notes', JSON.stringify(data.notes));
+        }
+      })
+      .catch((err) => console.warn('[Notes API Sync Notice]:', err.message));
+
+    // 2. Fetch Tasks from PostgreSQL API
+    fetch('/api/tasks')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.success && Array.isArray(data.tasks) && data.tasks.length > 0) {
+          setTasks(data.tasks);
+          localStorage.setItem('myits_tasks', JSON.stringify(data.tasks));
+        }
+      })
+      .catch((err) => console.warn('[Tasks API Sync Notice]:', err.message));
+  }, []);
+
   // Global Keyboard Shortcut Cmd+K
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -446,22 +471,32 @@ export function AppProvider({ children }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Action Helpers
+  // Action Helpers with PostgreSQL Sync
   const updateTaskStatus = (taskId, newStatus) => {
+    let updatedTaskObj = null;
     setTasks((prev) =>
       prev.map((t) => {
         if (t.id === taskId) {
           if (newStatus === 'selesai' && t.status !== 'selesai') {
             confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
           }
-          return { ...t, status: newStatus };
+          updatedTaskObj = { ...t, status: newStatus };
+          return updatedTaskObj;
         }
         return t;
       })
     );
+
+    if (updatedTaskObj) {
+      fetch('/api/tasks/' + taskId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedTaskObj),
+      }).catch((err) => console.warn('[updateTaskStatus API Notice]:', err.message));
+    }
   };
 
-  const addTask = (newTask) => {
+  const addTask = async (newTask) => {
     const taskObj = {
       id: 't_' + Date.now(),
       status: 'belum',
@@ -469,37 +504,76 @@ export function AppProvider({ children }) {
       ...newTask
     };
     setTasks((prev) => [taskObj, ...prev]);
+
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskObj),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.task) {
+          setTasks((prev) => prev.map((t) => (t.id === taskObj.id ? { ...t, ...data.task } : t)));
+        }
+      }
+    } catch (err) {
+      console.warn('[addTask API Notice]:', err.message);
+    }
   };
 
   const deleteTask = (taskId) => {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    fetch('/api/tasks/' + taskId, { method: 'DELETE' }).catch((err) =>
+      console.warn('[deleteTask API Notice]:', err.message)
+    );
   };
 
   const toggleSubtask = (taskId, subtaskId) => {
+    let updatedTaskObj = null;
     setTasks((prev) =>
       prev.map((t) => {
         if (t.id === taskId) {
           const updatedSubtasks = (t.subtasks || []).map((st) =>
             st.id === subtaskId ? { ...st, completed: !st.completed } : st
           );
-          return { ...t, subtasks: updatedSubtasks };
+          updatedTaskObj = { ...t, subtasks: updatedSubtasks };
+          return updatedTaskObj;
         }
         return t;
       })
     );
+
+    if (updatedTaskObj) {
+      fetch('/api/tasks/' + taskId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedTaskObj),
+      }).catch((err) => console.warn('[toggleSubtask API Notice]:', err.message));
+    }
   };
 
   const addSubtask = (taskId, subtaskText) => {
     if (!subtaskText.trim()) return;
+    let updatedTaskObj = null;
     setTasks((prev) =>
       prev.map((t) => {
         if (t.id === taskId) {
           const newSubtask = { id: 'st_' + Date.now(), text: subtaskText, completed: false };
-          return { ...t, subtasks: [...(t.subtasks || []), newSubtask] };
+          updatedTaskObj = { ...t, subtasks: [...(t.subtasks || []), newSubtask] };
+          return updatedTaskObj;
         }
         return t;
       })
     );
+
+    if (updatedTaskObj) {
+      fetch('/api/tasks/' + taskId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedTaskObj),
+      }).catch((err) => console.warn('[addSubtask API Notice]:', err.message));
+    }
   };
 
   const addScheduleEvent = (newEvent) => {
@@ -519,7 +593,7 @@ export function AppProvider({ children }) {
     setScheduleEvents((prev) => prev.filter((e) => e.id !== eventId));
   };
 
-  const addNote = (newNote) => {
+  const addNote = async (newNote) => {
     const noteObj = {
       id: 'n_' + Date.now(),
       updatedAt: new Date().toISOString().split('T')[0],
@@ -531,16 +605,46 @@ export function AppProvider({ children }) {
       ...newNote
     };
     setNotes((prev) => [noteObj, ...prev]);
+
+    try {
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(noteObj),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.note) {
+          setNotes((prev) => prev.map((n) => (n.id === noteObj.id ? { ...n, ...data.note } : n)));
+        }
+      }
+    } catch (err) {
+      console.warn('[addNote API Notice]:', err.message);
+    }
   };
 
   const updateNote = (updatedNote) => {
+    const updatedNoteWithTime = {
+      ...updatedNote,
+      updatedAt: new Date().toISOString().split('T')[0],
+    };
+
     setNotes((prev) =>
-      prev.map((n) => (n.id === updatedNote.id ? { ...n, ...updatedNote, updatedAt: 'Jumat, 28 Agustus 2026' } : n))
+      prev.map((n) => (n.id === updatedNote.id ? { ...n, ...updatedNoteWithTime } : n))
     );
+
+    fetch('/api/notes/' + updatedNote.id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedNoteWithTime),
+    }).catch((err) => console.warn('[updateNote API Notice]:', err.message));
   };
 
   const deleteNote = (noteId) => {
     setNotes((prev) => prev.filter((n) => n.id !== noteId && n.parentId !== noteId));
+    fetch('/api/notes/' + noteId, { method: 'DELETE' }).catch((err) =>
+      console.warn('[deleteNote API Notice]:', err.message)
+    );
   };
 
   const addDatabaseRow = (databaseId, newRowObj) => {

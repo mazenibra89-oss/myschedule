@@ -6,6 +6,10 @@ import healthHandler from './api/health.js';
 import filesIndexHandler from './api/files/index.js';
 import uploadHandler from './api/files/upload.js';
 import fileDetailHandler from './api/files/[id].js';
+import notesIndexHandler from './api/notes/index.js';
+import noteDetailHandler from './api/notes/[id].js';
+import tasksIndexHandler from './api/tasks/index.js';
+import taskDetailHandler from './api/tasks/[id].js';
 
 // Load environment variables from .env
 dotenv.config();
@@ -42,6 +46,18 @@ function localApiPlugin() {
             const id = pathname.replace('/api/files/', '');
             req.query = { ...req.query, id };
             return await fileDetailHandler(req, res);
+          } else if (pathname === '/api/notes') {
+            return await notesIndexHandler(req, res);
+          } else if (pathname.startsWith('/api/notes/')) {
+            const id = pathname.replace('/api/notes/', '');
+            req.query = { ...req.query, id };
+            return await noteDetailHandler(req, res);
+          } else if (pathname === '/api/tasks') {
+            return await tasksIndexHandler(req, res);
+          } else if (pathname.startsWith('/api/tasks/')) {
+            const id = pathname.replace('/api/tasks/', '');
+            req.query = { ...req.query, id };
+            return await taskDetailHandler(req, res);
           }
           next();
         } catch (err) {
