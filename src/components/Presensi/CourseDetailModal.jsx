@@ -21,8 +21,9 @@ export default function CourseDetailModal() {
   const handleClose = () => setSelectedCourseDetail(null);
 
   const handleDelete = () => {
-    if (item.id && !item.originalCourse) {
-      deleteScheduleEvent(item.id);
+    if (item.id) {
+      const targetId = item.eventId || String(item.id).replace(/^event_/, '');
+      deleteScheduleEvent(targetId);
     }
     handleClose();
   };
@@ -111,12 +112,12 @@ export default function CourseDetailModal() {
 
         {/* Footer Actions */}
         <div className="p-5 border-t border-[#282a36] bg-[#17181f] flex items-center justify-between">
-          {item.id && !item.originalCourse ? (
+          {item.id ? (
             <button
               onClick={handleDelete}
-              className="px-4 py-2 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs font-bold flex items-center gap-1.5 transition-all"
+              className="px-4 py-2 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
             >
-              <Trash2 className="w-3.5 h-3.5" /> Hapus Jadwal
+              <Trash2 className="w-4 h-4" /> Hapus Jadwal
             </button>
           ) : (
             <div></div>

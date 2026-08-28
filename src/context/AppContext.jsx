@@ -457,6 +457,17 @@ export function AppProvider({ children }) {
         }
       })
       .catch((err) => console.warn('[Tasks API Sync Notice]:', err.message));
+
+    // 3. Fetch Schedule Events from PostgreSQL API
+    fetch('/api/schedules')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.success && Array.isArray(data.events) && data.events.length > 0) {
+          setScheduleEvents(data.events);
+          localStorage.setItem('myits_events', JSON.stringify(data.events));
+        }
+      })
+      .catch((err) => console.warn('[Schedules API Sync Notice]:', err.message));
   }, []);
 
   // Global Keyboard Shortcut Cmd+K
@@ -472,27 +483,28 @@ export function AppProvider({ children }) {
   }, []);
 
   // Action Helpers with PostgreSQL Sync
-  const updateTaskStatus = (taskId, newStatus) => {
-    let updatedTaskObj = null;
+  const updateTaskStatus = async (taskId, newStatus) => {
+    const existingTask = tasks.find((t) => t.id === taskId);
+    const updatedTaskObj = existingTask
+      ? { ...existingTask, status: newStatus }
+      : { id: taskId, status: newStatus };
+
+    if (newStatus === 'selesai' && existingTask?.status !== 'selesai') {
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+    }
+
     setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === taskId) {
-          if (newStatus === 'selesai' && t.status !== 'selesai') {
-            confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
-          }
-          updatedTaskObj = { ...t, status: newStatus };
-          return updatedTaskObj;
-        }
-        return t;
-      })
+      prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
     );
 
-    if (updatedTaskObj) {
-      fetch('/api/tasks/' + taskId, {
+    try {
+      await fetch('/api/tasks/' + taskId, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedTaskObj),
-      }).catch((err) => console.warn('[updateTaskStatus API Notice]:', err.message));
+      });
+    } catch (err) {
+      console.warn('[updateTaskStatus API Notice]:', err.message);
     }
   };
 
@@ -576,7 +588,7 @@ export function AppProvider({ children }) {
     }
   };
 
-  const addScheduleEvent = (newEvent) => {
+  const addScheduleEvent = async (newEvent) => {
     const eventObj = {
       id: 'e_' + Date.now(),
       color: newEvent.color || '#0099dd',
@@ -587,10 +599,35 @@ export function AppProvider({ children }) {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
+
+    try {
+      const res = await fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(eventObj),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.event) {
+          setScheduleEvents((prev) => prev.map((e) => (e.id === eventObj.id ? { ...e, ...data.event } : e)));
+        }
+      }
+    } catch (err) {
+      console.warn('[addScheduleEvent API Notice]:', err.message);
+    }
   };
 
   const deleteScheduleEvent = (eventId) => {
-    setScheduleEvents((prev) => prev.filter((e) => e.id !== eventId));
+    if (!eventId) return;
+    const cleanId = String(eventId).replace(/^event_/, '');
+
+    setScheduleEvents((prev) =>
+      prev.filter((e) => e.id !== cleanId && e.id !== eventId && ('event_' + e.id) !== eventId)
+    );
+
+    fetch('/api/schedules/' + cleanId, { method: 'DELETE' }).catch((err) =>
+      console.warn('[deleteScheduleEvent API Notice]:', err.message)
+    );
   };
 
   const addNote = async (newNote) => {

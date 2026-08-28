@@ -10,6 +10,8 @@ import notesIndexHandler from './api/notes/index.js';
 import noteDetailHandler from './api/notes/[id].js';
 import tasksIndexHandler from './api/tasks/index.js';
 import taskDetailHandler from './api/tasks/[id].js';
+import schedulesIndexHandler from './api/schedules/index.js';
+import scheduleDetailHandler from './api/schedules/[id].js';
 
 // Load environment variables from .env
 dotenv.config();
@@ -58,6 +60,12 @@ function localApiPlugin() {
             const id = pathname.replace('/api/tasks/', '');
             req.query = { ...req.query, id };
             return await taskDetailHandler(req, res);
+          } else if (pathname === '/api/schedules') {
+            return await schedulesIndexHandler(req, res);
+          } else if (pathname.startsWith('/api/schedules/')) {
+            const id = pathname.replace('/api/schedules/', '');
+            req.query = { ...req.query, id };
+            return await scheduleDetailHandler(req, res);
           }
           next();
         } catch (err) {
