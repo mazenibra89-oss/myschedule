@@ -135,17 +135,18 @@ export default function NotesWorkspace() {
 
       if (res.ok) {
         const data = await res.json();
-        if (data.success && data.file) {
+        if (data.success) {
+          const targetUrl = data.file?.drive_view_link || data.url;
           const fileBlock = {
             id: 'b_file_' + Date.now(),
             type: isImage ? 'image' : 'file',
-            fileName: data.file.name || file.name,
+            fileName: data.file?.name || file.name,
             fileSize: formattedSize,
             fileType: file.type,
-            url: data.file.drive_view_link,
-            driveFileId: data.file.drive_file_id,
-            driveViewLink: data.file.drive_view_link,
-            content: data.file.name || file.name
+            url: targetUrl,
+            driveFileId: data.file?.drive_file_id,
+            driveViewLink: targetUrl,
+            content: data.file?.name || file.name
           };
 
           const updated = {
@@ -186,6 +187,98 @@ export default function NotesWorkspace() {
 
     reader.readAsDataURL(file);
     e.target.value = '';
+  };
+
+  // Universal File & Image Preview Handler (Handles Data URLs, Blob URLs & HTTP links without browser blocks)
+  const handlePreviewFile = (block) => {
+    if (!block || !block.url) {
+      alert('URL file tidak ditemukan.');
+      return;
+    }
+
+    // 1. Image preview modal
+    if (block.type === 'image' || (block.fileType && block.fileType.startsWith('image/'))) {
+      setActiveMediaPreview({
+        url: block.url,
+        fileName: block.fileName || block.content || 'Gambar',
+        fileType: block.fileType || 'image/png'
+      });
+      return;
+    }
+
+    // 2. Data URL Base64 preview conversion to Blob Object URL
+    if (block.url.startsWith('data:')) {
+      try {
+        const parts = block.url.split(',');
+        const mimeMatch = parts[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
+        const bstr = atob(parts[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const fileBlob = new Blob([u8arr], { type: mime });
+        const objectUrl = URL.createObjectURL(fileBlob);
+
+        const win = window.open(objectUrl, '_blank');
+        if (!win) {
+          handleDownloadFile(block);
+        }
+        return;
+      } catch (err) {
+        console.error('[Preview Data URL Error]:', err);
+        handleDownloadFile(block);
+        return;
+      }
+    }
+
+    // 3. Direct HTTP / Vercel Blob / Google Drive URLs
+    window.open(block.url, '_blank', 'noopener,noreferrer');
+  };
+
+  // Universal File & Image Download Handler
+  const handleDownloadFile = (block) => {
+    if (!block || !block.url) {
+      alert('URL file tidak ditemukan.');
+      return;
+    }
+
+    const fileName = block.fileName || block.content || 'file_catatan';
+
+    if (block.url.startsWith('data:')) {
+      try {
+        const parts = block.url.split(',');
+        const mimeMatch = parts[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+        const bstr = atob(parts[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const fileBlob = new Blob([u8arr], { type: mime });
+        const objectUrl = URL.createObjectURL(fileBlob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
+        return;
+      } catch (err) {
+        console.error('[Download Data URL Error]:', err);
+      }
+    }
+
+    const a = document.createElement('a');
+    a.href = block.url;
+    a.download = fileName;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const handleUpdateBlockContent = (blockId, newContent) => {
@@ -579,7 +672,7 @@ export default function NotesWorkspace() {
                           {block.type === 'image' && (
                             <div className="space-y-2 p-3 rounded-2xl bg-[#14151a] border border-[#272935]">
                               <div
-                                onClick={() => setActiveMediaPreview({ url: block.url, fileName: block.fileName || block.content, type: 'image' })}
+                                onClick={() => handlePreviewFile(block)}
                                 className="relative group cursor-pointer overflow-hidden rounded-xl bg-black/40 border border-[#262835] flex items-center justify-center max-h-96"
                               >
                                 <img
@@ -597,20 +690,20 @@ export default function NotesWorkspace() {
                                 <div className="flex items-center gap-2 ml-auto shrink-0">
                                   <button
                                     type="button"
-                                    onClick={() => setActiveMediaPreview({ url: block.url, fileName: block.fileName || block.content, type: 'image' })}
-                                    className="px-2.5 py-1 rounded-lg bg-[#20222d] hover:bg-[#0099dd] text-[#38bdf8] hover:text-white font-semibold flex items-center gap-1 transition-all"
+                                    onClick={() => handlePreviewFile(block)}
+                                    className="px-2.5 py-1 rounded-lg bg-[#20222d] hover:bg-[#0099dd] text-[#38bdf8] hover:text-white font-semibold flex items-center gap-1 transition-all cursor-pointer"
                                   >
                                     <Eye className="w-3.5 h-3.5" />
                                     <span>Lihat</span>
                                   </button>
-                                  <a
-                                    href={block.url}
-                                    download={block.fileName || 'gambar_catatan'}
-                                    className="px-2.5 py-1 rounded-lg bg-[#20222d] hover:bg-emerald-600 text-emerald-400 hover:text-white font-semibold flex items-center gap-1 transition-all"
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadFile(block)}
+                                    className="px-2.5 py-1 rounded-lg bg-[#20222d] hover:bg-emerald-600 text-emerald-400 hover:text-white font-semibold flex items-center gap-1 transition-all cursor-pointer"
                                   >
                                     <Download className="w-3.5 h-3.5" />
                                     <span>Unduh</span>
-                                  </a>
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -629,23 +722,22 @@ export default function NotesWorkspace() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
-                                <a
-                                  href={block.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-3 py-1.5 rounded-xl bg-[#20222d] hover:bg-[#2a2d3c] text-[#38bdf8] text-xs font-semibold flex items-center gap-1.5 transition-all"
+                                <button
+                                  type="button"
+                                  onClick={() => handlePreviewFile(block)}
+                                  className="px-3 py-1.5 rounded-xl bg-[#20222d] hover:bg-[#2a2d3c] text-[#38bdf8] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
                                 >
                                   <Eye className="w-3.5 h-3.5" />
                                   <span>Lihat</span>
-                                </a>
-                                <a
-                                  href={block.url}
-                                  download={block.fileName || 'file_catatan'}
-                                  className="px-3 py-1.5 rounded-xl bg-[#0099dd] hover:bg-[#0088cc] text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-cyan-900/20"
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadFile(block)}
+                                  className="px-3 py-1.5 rounded-xl bg-[#0099dd] hover:bg-[#0088cc] text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-cyan-900/20 cursor-pointer"
                                 >
                                   <Download className="w-3.5 h-3.5" />
                                   <span>Unduh</span>
-                                </a>
+                                </button>
                               </div>
                             </div>
                           )}
@@ -737,7 +829,7 @@ export default function NotesWorkspace() {
                                 <span>{block.fileSize}</span>
                               </div>
                               <div
-                                onClick={() => setActiveMediaPreview({ url: block.url, fileName: block.fileName || block.content, type: 'image' })}
+                                onClick={() => handlePreviewFile(block)}
                                 className="relative group cursor-pointer overflow-hidden rounded-xl bg-black/40 border border-[#262835] flex items-center justify-center max-h-96"
                               >
                                 <img
@@ -768,28 +860,27 @@ export default function NotesWorkspace() {
                                   <FileText className="w-5 h-5" />
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-xs font-bold text-white truncate">{block.fileName || block.content}</p>
+                                  <p className="text-xs font-bold text-[#e2e8f0] truncate">{block.fileName || block.content}</p>
                                   <p className="text-[10px] text-[#787e91]">{block.fileSize || 'Dokumen'}</p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
-                                <a
-                                  href={block.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-3 py-1.5 rounded-xl bg-[#20222d] hover:bg-[#2a2d3c] text-[#38bdf8] text-xs font-semibold flex items-center gap-1.5 transition-all"
+                                <button
+                                  type="button"
+                                  onClick={() => handlePreviewFile(block)}
+                                  className="px-3 py-1.5 rounded-xl bg-[#20222d] hover:bg-[#2a2d3c] text-[#38bdf8] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
                                 >
                                   <Eye className="w-3.5 h-3.5" />
                                   <span>Lihat</span>
-                                </a>
-                                <a
-                                  href={block.url}
-                                  download={block.fileName || 'file_catatan'}
-                                  className="px-3 py-1.5 rounded-xl bg-[#0099dd] hover:bg-[#0088cc] text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-cyan-900/20"
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadFile(block)}
+                                  className="px-3 py-1.5 rounded-xl bg-[#0099dd] hover:bg-[#0088cc] text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-cyan-900/20 cursor-pointer"
                                 >
                                   <Download className="w-3.5 h-3.5" />
                                   <span>Unduh</span>
-                                </a>
+                                </button>
                               </div>
                             </div>
                           )}
