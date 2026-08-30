@@ -14,6 +14,7 @@ import schedulesIndexHandler from './api/schedules/index.js';
 import scheduleDetailHandler from './api/schedules/[id].js';
 import coursesIndexHandler from './api/courses/index.js';
 import courseDetailHandler from './api/courses/[id].js';
+import cronRemindersHandler from './api/cron/reminders.js';
 
 // Load environment variables from .env
 dotenv.config();
@@ -74,6 +75,8 @@ function localApiPlugin() {
             const id = pathname.replace('/api/courses/', '');
             req.query = { ...req.query, id };
             return await courseDetailHandler(req, res);
+          } else if (pathname === '/api/cron/reminders') {
+            return await cronRemindersHandler(req, res);
           }
           next();
         } catch (err) {

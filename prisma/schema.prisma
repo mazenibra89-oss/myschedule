@@ -24,16 +24,17 @@ model FileMetadata {
 
 // 2. User Profile Table
 model UserProfile {
-  id         String   @id @default("default_user")
-  name       String
-  email      String   @unique
-  nrp        String
-  department String
-  semester   Int      @default(5)
-  ipk        Float    @default(3.84)
-  sksTaken   Int      @default(84)
-  avatar     String
-  updatedAt  DateTime @updatedAt
+  id             String   @id @default("default_user")
+  name           String
+  email          String   @unique
+  nrp            String
+  department     String
+  semester       Int      @default(5)
+  ipk            Float    @default(3.84)
+  sksTaken       Int      @default(84)
+  avatar         String
+  whatsappNumber String?  @default("")
+  updatedAt      DateTime @updatedAt
 
   @@map("user_profiles")
 }
@@ -58,16 +59,18 @@ model Course {
 
 // 4. Tasks Table
 model Task {
-  id          String   @id @default(uuid())
-  title       String
-  courseId    String   @default("general")
-  category    String   @default("Akademik")
-  priority    String   @default("Sedang")
-  status      String   @default("belum") // 'belum' | 'selesai'
-  dueDate     String
-  description String?
-  subtasks    Json     @default("[]")
-  createdAt   DateTime @default(now())
+  id            String   @id @default(uuid())
+  title         String
+  courseId      String   @default("general")
+  category      String   @default("Akademik")
+  priority      String   @default("Sedang")
+  status        String   @default("belum") // 'belum' | 'selesai'
+  dueDate       String
+  dueTime       String   @default("23:59")
+  description   String?
+  subtasks      Json     @default("[]")
+  notifiedTiers String[] @default([])
+  createdAt     DateTime @default(now())
 
   @@map("tasks")
 }
