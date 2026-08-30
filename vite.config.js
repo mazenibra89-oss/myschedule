@@ -2,18 +2,12 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import dotenv from 'dotenv';
-import healthHandler from './api/health.js';
 import filesIndexHandler from './api/files/index.js';
 import uploadHandler from './api/files/upload.js';
-import fileDetailHandler from './api/files/[id].js';
 import notesIndexHandler from './api/notes/index.js';
-import noteDetailHandler from './api/notes/[id].js';
 import tasksIndexHandler from './api/tasks/index.js';
-import taskDetailHandler from './api/tasks/[id].js';
 import schedulesIndexHandler from './api/schedules/index.js';
-import scheduleDetailHandler from './api/schedules/[id].js';
 import coursesIndexHandler from './api/courses/index.js';
-import courseDetailHandler from './api/courses/[id].js';
 import cronRemindersHandler from './api/cron/reminders.js';
 
 // Load environment variables from .env
@@ -41,40 +35,28 @@ function localApiPlugin() {
         const pathname = url.pathname;
 
         try {
-          if (pathname === '/api/health') {
-            return await healthHandler(req, res);
-          } else if (pathname === '/api/files/upload') {
+          if (pathname === '/api/files/upload') {
             return await uploadHandler(req, res);
-          } else if (pathname === '/api/files') {
+          } else if (pathname.startsWith('/api/files')) {
+            const id = pathname.replace('/api/files/', '').replace('/api/files', '');
+            if (id) req.query = { ...req.query, id };
             return await filesIndexHandler(req, res);
-          } else if (pathname.startsWith('/api/files/')) {
-            const id = pathname.replace('/api/files/', '');
-            req.query = { ...req.query, id };
-            return await fileDetailHandler(req, res);
-          } else if (pathname === '/api/notes') {
+          } else if (pathname.startsWith('/api/notes')) {
+            const id = pathname.replace('/api/notes/', '').replace('/api/notes', '');
+            if (id) req.query = { ...req.query, id };
             return await notesIndexHandler(req, res);
-          } else if (pathname.startsWith('/api/notes/')) {
-            const id = pathname.replace('/api/notes/', '');
-            req.query = { ...req.query, id };
-            return await noteDetailHandler(req, res);
-          } else if (pathname === '/api/tasks') {
+          } else if (pathname.startsWith('/api/tasks')) {
+            const id = pathname.replace('/api/tasks/', '').replace('/api/tasks', '');
+            if (id) req.query = { ...req.query, id };
             return await tasksIndexHandler(req, res);
-          } else if (pathname.startsWith('/api/tasks/')) {
-            const id = pathname.replace('/api/tasks/', '');
-            req.query = { ...req.query, id };
-            return await taskDetailHandler(req, res);
-          } else if (pathname === '/api/schedules') {
+          } else if (pathname.startsWith('/api/schedules')) {
+            const id = pathname.replace('/api/schedules/', '').replace('/api/schedules', '');
+            if (id) req.query = { ...req.query, id };
             return await schedulesIndexHandler(req, res);
-          } else if (pathname.startsWith('/api/schedules/')) {
-            const id = pathname.replace('/api/schedules/', '');
-            req.query = { ...req.query, id };
-            return await scheduleDetailHandler(req, res);
-          } else if (pathname === '/api/courses') {
+          } else if (pathname.startsWith('/api/courses')) {
+            const id = pathname.replace('/api/courses/', '').replace('/api/courses', '');
+            if (id) req.query = { ...req.query, id };
             return await coursesIndexHandler(req, res);
-          } else if (pathname.startsWith('/api/courses/')) {
-            const id = pathname.replace('/api/courses/', '');
-            req.query = { ...req.query, id };
-            return await courseDetailHandler(req, res);
           } else if (pathname === '/api/cron/reminders') {
             return await cronRemindersHandler(req, res);
           }
