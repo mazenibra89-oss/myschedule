@@ -52,16 +52,16 @@ export default async function handler(req, res) {
 
       if (diffHours <= 1 && !notifiedTiers.includes('1h')) {
         triggeredTier = '1h';
-        reminderMessage = `🚨 *DARURAT (1 JAM SEBELUM DEADLINE)* 🚨\n\n📝 *Tugas:* ${task.title}\n📂 *Kategori:* ${task.category}\n⏰ *Tenggat Waktu:* Hari ini jam ${dueTimeStr}\n\nSegera kumpulkan tugas Anda sebelum terlambat! ⚡`;
+        reminderMessage = `*DARURAT (1 JAM SEBELUM DEADLINE)*\n\n📝 *Tugas:* ${task.title}\n📂 *Kategori:* ${task.category}\n⏰ *Tenggat Waktu:* Hari ini jam ${dueTimeStr}\n\nSegera kumpulkan tugas Anda sebelum terlambat! ⚡\n@myschedule`;
       } else if (diffHours <= 3 && !notifiedTiers.includes('3h')) {
         triggeredTier = '3h';
-        reminderMessage = `⚠️ *PENGINGAT 3 JAM SEBELUM DEADLINE* ⚠️\n\n📝 *Tugas:* ${task.title}\n📂 *Kategori:* ${task.category}\n⏰ *Tenggat Waktu:* Hari ini jam ${dueTimeStr}\n\nWaktu tersisa kurang dari 3 jam. Tetap fokus! 💪`;
+        reminderMessage = `*PENGINGAT 3 JAM SEBELUM DEADLINE*\n\n📝 *Tugas:* ${task.title}\n📂 *Kategori:* ${task.category}\n⏰ *Tenggat Waktu:* Hari ini jam ${dueTimeStr}\n\nWaktu tersisa kurang dari 3 jam. Tetap fokus! 💪\n@myschedule`;
       } else if (diffHours <= 5 && !notifiedTiers.includes('5h')) {
         triggeredTier = '5h';
-        reminderMessage = `🔔 *PENGINGAT 5 JAM SEBELUM DEADLINE* 🔔\n\n📝 *Tugas:* ${task.title}\n📂 *Kategori:* ${task.category}\n⏰ *Tenggat Waktu:* Hari ini jam ${dueTimeStr}\n\nPastikan pengerjaan tugas sudah hampir selesai ya! ✨`;
+        reminderMessage = `*PENGINGAT 5 JAM SEBELUM DEADLINE*\n\n📝 *Tugas:* ${task.title}\n📂 *Kategori:* ${task.category}\n⏰ *Tenggat Waktu:* Hari ini jam ${dueTimeStr}\n\nPastikan pengerjaan tugas sudah hampir selesai ya! ✨\n@myschedule`;
       } else if (diffHours <= 10 && !notifiedTiers.includes('10h')) {
         triggeredTier = '10h';
-        reminderMessage = `📌 *PENGINGAT 10 JAM SEBELUM DEADLINE* 📌\n\n📝 *Tugas:* ${task.title}\n📂 *Kategori:* ${task.category}\n⏰ *Tenggat Waktu:* Jam ${dueTimeStr}\n\nJangan lupa ada tugas yang perlu diselesaikan hari ini! 🚀`;
+        reminderMessage = `*PENGINGAT 10 JAM SEBELUM DEADLINE*\n\n📝 *Tugas:* ${task.title}\n📂 *Kategori:* ${task.category}\n⏰ *Tenggat Waktu:* Jam ${dueTimeStr}\n\nJangan lupa ada tugas yang perlu diselesaikan hari ini! 🚀\n@myschedule`;
       }
 
       if (triggeredTier && reminderMessage) {
@@ -123,11 +123,11 @@ export default async function handler(req, res) {
         },
       });
 
-      // Format Message Digest
-      let digestMsg = `🌙 *JADWAL & AGENDA BESOK* 🌙\n📅 *${tomorrowDayName}, ${tomorrowDateStr}*\n\n`;
+      // Format Message Digest exactly as requested by user
+      let digestMsg = `*JADWAL & AGENDA BESOK*\n📅 *${tomorrowDayName}, ${tomorrowDateStr}*\n\n`;
 
       if (tomorrowCourses.length === 0 && tomorrowEvents.length === 0) {
-        digestMsg += `🎉 *Tidak ada jadwal kuliah atau kegiatan kustom besok.* Nikmati waktu istirahat Anda!\n\n`;
+        digestMsg += `*Tidak ada jadwal kuliah atau kegiatan kustom besok.* Nikmati waktu istirahat Anda!\n\n`;
       } else {
         digestMsg += `📚 *Mata Kuliah & Kegiatan:* \n`;
         let count = 1;
@@ -135,7 +135,7 @@ export default async function handler(req, res) {
           digestMsg += `${count++}. *${c.name}*\n   ⏰ ${c.time} | 📍 ${c.room}\n`;
         });
         tomorrowEvents.forEach((e) => {
-          digestMsg += `${count++}. *${e.title}*\n   ⏰ ${e.time || 'Fleksibel'} | 📍 ${e.location || 'Daring'}\n`;
+          digestMsg += `${count++}. *${e.title}*\n   ⏰ ${e.time || 'Fleksibel'} | 📍 ${e.location || 'Fleksibel / Daring'}\n`;
         });
         digestMsg += `\n`;
       }
@@ -148,7 +148,7 @@ export default async function handler(req, res) {
         digestMsg += `\n`;
       }
 
-      digestMsg += `Semangat untuk esok hari! 🚀\n-- _Sent automatically by MyITS Schedule_`;
+      digestMsg += `Semangat untuk esok hari! 🚀\n@myschedule`;
 
       if (waNumber) {
         const sendDigestRes = await sendWhatsAppMessage(waNumber, digestMsg);
