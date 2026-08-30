@@ -20,11 +20,13 @@ import {
   Paperclip,
   FileText,
   Download,
+  GripVertical,
+  X,
   Image as ImageIcon
 } from 'lucide-react';
 
 export default function NotesWorkspace() {
-  const { notes, addNote, updateNote, deleteNote, courses } = useApp();
+  const { notes, addNote, updateNote, deleteNote, reorderNotes, courses } = useApp();
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('Semua'); // 'Semua' | 'Akademik' | 'Non-Akademik'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedNoteId, setSelectedNoteId] = useState(notes[0]?.id || null);
@@ -33,6 +35,7 @@ export default function NotesWorkspace() {
   const [previewMode, setPreviewMode] = useState(true);
   const [activeMediaPreview, setActiveMediaPreview] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [draggedNoteId, setDraggedNoteId] = useState(null);
 
   const fileInputRef = useRef(null);
 
@@ -57,6 +60,44 @@ export default function NotesWorkspace() {
   const handleSelectNote = (note) => {
     setSelectedNoteId(note.id);
     setActiveNote(note);
+  };
+
+  // Helper to extract raw direct URL for Google Drive, Vercel Blob, Base64 images
+  const getDirectImageUrl = (url) => {
+    if (!url) return '';
+    if (url.includes('drive.google.com/file/d/')) {
+      const match = url.match(/\/d\/([^/]+)/);
+      if (match && match[1]) {
+        return `https://lh3.googleusercontent.com/d/${match[1]}`;
+      }
+    }
+    return url;
+  };
+
+  // Drag and Drop handlers for page/sub-page reordering (Enabled in Edit Mode)
+  const handleDragStartNote = (e, noteId) => {
+    if (previewMode) return;
+    setDraggedNoteId(noteId);
+    e.dataTransfer.setData('text/plain', noteId);
+  };
+
+  const handleDropNote = (e, targetNoteId) => {
+    if (previewMode) return;
+    e.preventDefault();
+    if (!draggedNoteId || draggedNoteId === targetNoteId) return;
+
+    const sourceIdx = notes.findIndex((n) => n.id === draggedNoteId);
+    const targetIdx = notes.findIndex((n) => n.id === targetNoteId);
+
+    if (sourceIdx !== -1 && targetIdx !== -1) {
+      const updatedNotes = [...notes];
+      const [draggedItem] = updatedNotes.splice(sourceIdx, 1);
+      updatedNotes.splice(targetIdx, 0, draggedItem);
+      if (reorderNotes) {
+        reorderNotes(updatedNotes);
+      }
+    }
+    setDraggedNoteId(null);
   };
 
   // Create a brand new Top-Level Note
@@ -197,10 +238,11 @@ export default function NotesWorkspace() {
     }
 
     // 1. Image preview modal
-    if (block.type === 'image' || (block.fileType && block.fileType.startsWith('image/'))) {
+    if (block.type === 'image' || (block.fileType && block.fileType.startsWith('image/')) || block.url.startsWith('data:image/')) {
+      const directUrl = getDirectImageUrl(block.url);
       setActiveMediaPreview({
-        url: block.url,
-        fileName: block.fileName || block.content || 'Gambar',
+        url: directUrl,
+        fileName: block.fileName || block.content || 'Gambar Sisipan',
         fileType: block.fileType || 'image/png'
       });
       return;
@@ -424,16 +466,24 @@ export default function NotesWorkspace() {
 
                 return (
                   <div key={parent.id} className="space-y-1">
-                    {/* Parent Note Row */}
+                    {/* Parent Note Row (Draggable in Edit Mode) */}
                     <div
                       onClick={() => handleSelectNote(parent)}
+                      draggable={!previewMode}
+                      onDragStart={(e) => handleDragStartNote(e, parent.id)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => handleDropNote(e, parent.id)}
                       className={`p-2.5 rounded-xl cursor-pointer flex items-center justify-between group transition-all text-xs ${
                         isSelected
                           ? 'bg-[#00425a] text-white font-bold border-l-4 border-[#0099dd]'
                           : 'hover:bg-[#222430] text-[#9ea4b5]'
-                      }`}
+                      } ${!previewMode ? 'hover:border hover:border-[#38bdf8]/30' : ''}`}
                     >
                       <div className="flex items-center gap-2 truncate min-w-0">
+                        {!previewMode && (
+                          <GripVertical className="w-3.5 h-3.5 text-[#646a7c] cursor-grab active:cursor-grabbing shrink-0" />
+                        )}
+
                         {hasChildren ? (
                           <button
                             onClick={(e) => toggleExpandParent(parent.id, e)}
@@ -452,19 +502,24 @@ export default function NotesWorkspace() {
                         <span className="truncate">{parent.title}</span>
                       </div>
 
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteNote(parent.id);
-                        }}
-                        className="text-[#646a7c] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-1"
-                        title="Hapus Halaman Ini"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {/* Delete Button (ONLY Visible directly in Edit Mode) */}
+                      {!previewMode && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Apakah Anda yakin ingin menghapus halaman "${parent.title}"?`)) {
+                              deleteNote(parent.id);
+                            }
+                          }}
+                          className="p-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-all cursor-pointer shrink-0 ml-1"
+                          title="Hapus Halaman Ini"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
 
-                    {/* Sub-Pages / Child Notes List (Nested Hierarchy) */}
+                    {/* Sub-Pages / Child Notes List (Nested Hierarchy & Draggable in Edit Mode) */}
                     {hasChildren && isExpanded && (
                       <div className="ml-5 pl-2 border-l border-[#282a36] space-y-1">
                         {childNotes.map((child) => {
@@ -474,27 +529,39 @@ export default function NotesWorkspace() {
                             <div
                               key={child.id}
                               onClick={() => handleSelectNote(child)}
+                              draggable={!previewMode}
+                              onDragStart={(e) => handleDragStartNote(e, child.id)}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={(e) => handleDropNote(e, child.id)}
                               className={`p-2 rounded-lg cursor-pointer flex items-center justify-between text-xs group transition-all ${
                                 isChildSelected
                                   ? 'bg-[#00425a]/80 text-[#38bdf8] font-bold border-l-2 border-[#0099dd]'
                                   : 'hover:bg-[#20222d] text-[#8e94a6]'
                               }`}
                             >
-                              <div className="flex items-center gap-2 truncate">
+                              <div className="flex items-center gap-2 truncate min-w-0">
+                                {!previewMode && (
+                                  <GripVertical className="w-3 h-3 text-[#646a7c] cursor-grab active:cursor-grabbing shrink-0" />
+                                )}
                                 <CornerDownRight className="w-3 h-3 text-[#646a7c] shrink-0" />
                                 <span className="truncate">{child.title}</span>
                               </div>
 
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteNote(child.id);
-                                }}
-                                className="text-[#646a7c] hover:text-red-400 opacity-0 group-hover:opacity-100 p-1"
-                                title="Hapus Sub-Halaman"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {/* Sub-Page Delete Button (ONLY Visible directly in Edit Mode) */}
+                              {!previewMode && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm(`Apakah Anda yakin ingin menghapus sub-halaman "${child.title}"?`)) {
+                                      deleteNote(child.id);
+                                    }
+                                  }}
+                                  className="p-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-all cursor-pointer shrink-0 ml-1"
+                                  title="Hapus Sub-Halaman Ini"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           );
                         })}
@@ -676,7 +743,7 @@ export default function NotesWorkspace() {
                                 className="relative group cursor-pointer overflow-hidden rounded-xl bg-black/40 border border-[#262835] flex items-center justify-center max-h-96"
                               >
                                 <img
-                                  src={block.url}
+                                  src={getDirectImageUrl(block.url)}
                                   alt={block.fileName || 'Gambar'}
                                   className="max-h-96 max-w-full rounded-xl object-contain transition-transform duration-300 group-hover:scale-105"
                                 />
@@ -833,7 +900,7 @@ export default function NotesWorkspace() {
                                 className="relative group cursor-pointer overflow-hidden rounded-xl bg-black/40 border border-[#262835] flex items-center justify-center max-h-96"
                               >
                                 <img
-                                  src={block.url}
+                                  src={getDirectImageUrl(block.url)}
                                   alt={block.fileName || 'Gambar'}
                                   className="max-h-96 max-w-full rounded-xl object-contain transition-transform duration-300 group-hover:scale-105"
                                 />
@@ -933,7 +1000,7 @@ export default function NotesWorkspace() {
             {/* Full Image Display Container */}
             <div className="p-4 sm:p-6 bg-black/60 flex items-center justify-center max-h-[75vh] overflow-auto">
               <img
-                src={activeMediaPreview.url}
+                src={getDirectImageUrl(activeMediaPreview.url)}
                 alt={activeMediaPreview.fileName || 'Preview'}
                 className="max-h-[70vh] w-auto max-w-full rounded-xl object-contain shadow-2xl border border-[#272935]"
               />

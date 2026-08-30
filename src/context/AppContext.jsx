@@ -758,6 +758,11 @@ export function AppProvider({ children }) {
     );
   };
 
+  const reorderNotes = (newNotesList) => {
+    setNotes(newNotesList);
+    localStorage.setItem('myits_notes', JSON.stringify(newNotesList));
+  };
+
   const addDatabaseRow = (databaseId, newRowObj) => {
     setDatabases((prev) =>
       prev.map((db) => {
@@ -887,6 +892,7 @@ export function AppProvider({ children }) {
         addNote,
         updateNote,
         deleteNote,
+        reorderNotes,
         addDatabaseRow,
         deleteDatabaseRow,
         toggleHabit,
