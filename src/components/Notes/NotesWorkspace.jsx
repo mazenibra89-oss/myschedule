@@ -27,7 +27,7 @@ import {
 
 export default function NotesWorkspace() {
   const { notes, addNote, updateNote, deleteNote, reorderNotes, courses } = useApp();
-  const [activeCategoryFilter, setActiveCategoryFilter] = useState('Semua'); // 'Semua' | 'Akademik' | 'Non-Akademik'
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState('Akademik'); // 'Akademik' | 'Non-Akademik'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedNoteId, setSelectedNoteId] = useState(notes[0]?.id || null);
   const [activeNote, setActiveNote] = useState(notes[0] || null);
@@ -356,11 +356,11 @@ export default function NotesWorkspace() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Filter notes by Category & Search query
+  // Filter notes by Category & Search query (ONLY Akademik & Non-Akademik)
   const filteredNotes = notes.filter((n) => {
-    const matchesSearch = n.title.toLowerCase().includes(searchQuery.toLowerCase());
-    if (activeCategoryFilter === 'Semua') return matchesSearch;
-    return matchesSearch && n.category === activeCategoryFilter;
+    const matchesSearch = (n.title || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const cat = n.category === 'Non-Akademik' ? 'Non-Akademik' : 'Akademik';
+    return matchesSearch && cat === activeCategoryFilter;
   });
 
   // Top level parent notes (parentId === null)
@@ -448,10 +448,9 @@ export default function NotesWorkspace() {
               <select
                 value={activeCategoryFilter}
                 onChange={(e) => setActiveCategoryFilter(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-[#131419] border border-[#2a2c38] text-white text-xs font-semibold focus:outline-none"
+                className="w-full px-3 py-2 rounded-xl bg-[#131419] border border-[#2a2c38] text-white text-xs font-semibold focus:outline-none cursor-pointer"
               >
-                <option value="Semua">Semua Kategori ({notes.length})</option>
-                <option value="Akademik">Akademik ({notes.filter((n) => n.category === 'Akademik').length})</option>
+                <option value="Akademik">Akademik ({notes.filter((n) => n.category !== 'Non-Akademik').length})</option>
                 <option value="Non-Akademik">Non-Akademik ({notes.filter((n) => n.category === 'Non-Akademik').length})</option>
               </select>
             </div>
