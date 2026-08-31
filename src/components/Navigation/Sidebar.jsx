@@ -41,14 +41,14 @@ export default function Sidebar() {
           onClick={() => handleMobileNavClick('beranda')}
         >
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#005072] to-[#0099dd] flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-cyan-900/30 shrink-0">
-            m
+            S
           </div>
           {(!isSidebarCollapsed || isMobile) && (
             <div>
               <div className="flex items-baseline font-bold text-white tracking-wide text-lg">
-                myITS <span className="text-xs ml-1 text-[#0099dd]">v2</span>
+                My <span className="text-[#0099dd] ml-1">Schedule</span>
               </div>
-              <div className="text-xs text-[#8e94a5] font-medium -mt-1 tracking-wider">Academics</div>
+              <div className="text-[11px] text-[#8e94a5] font-medium -mt-1 tracking-wider">Workspace & Tasks</div>
             </div>
           )}
         </div>

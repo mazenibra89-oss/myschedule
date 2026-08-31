@@ -21,7 +21,7 @@ export default function Header() {
       case 'personalisasi':
         return 'Personalisasi & Pengaturan';
       default:
-        return 'Academics Workspace';
+        return 'My Schedule Workspace';
     }
   };
 
