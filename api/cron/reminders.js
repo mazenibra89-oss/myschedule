@@ -86,15 +86,17 @@ export default async function handler(req, res) {
     }
 
     // ----------------------------------------------------
-    // 2. NIGHTLY 20:00 WIB SCHEDULE DIGEST FOR TOMORROW
+    // 2. NIGHTLY SCHEDULE DIGEST FOR TOMORROW
     // ----------------------------------------------------
     // Get current hour in WIB (UTC+7)
     const currentUTCHour = now.getUTCHours();
     const currentWIBHour = (currentUTCHour + 7) % 24;
 
-    const forceNightly = req.query.testNightly === 'true' || req.body?.testNightly === true;
+    const userAgent = String(req.headers['user-agent'] || '');
+    const isVercelCron = userAgent.includes('vercel-cron') || req.headers['x-vercel-cron'] === '1';
+    const forceNightly = req.query.testNightly === 'true' || req.body?.testNightly === true || isVercelCron;
 
-    if (currentWIBHour === 20 || forceNightly) {
+    if (currentWIBHour === 20 || currentWIBHour === 21 || forceNightly) {
       // Calculate Tomorrow's Date
       const tomorrowObj = new Date(now);
       tomorrowObj.setDate(tomorrowObj.getDate() + 1);
