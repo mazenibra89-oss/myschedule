@@ -437,13 +437,34 @@ export function AppProvider({ children }) {
   // Centralized Real-time Auto-Sync Engine from PostgreSQL Database
   const fetchAllDataFromDB = async () => {
     try {
-      // 1. Sync Notes
+      // 1. Sync Notes (Preserving local drag-and-drop hierarchy order)
       const resNotes = await fetch('/api/notes');
       if (resNotes.ok) {
         const dataNotes = await resNotes.json();
         if (dataNotes && dataNotes.success && Array.isArray(dataNotes.notes)) {
-          setNotes(dataNotes.notes);
-          localStorage.setItem('myits_notes', JSON.stringify(dataNotes.notes));
+          const savedLocal = localStorage.getItem('myits_notes');
+          if (savedLocal) {
+            try {
+              const localArr = JSON.parse(savedLocal);
+              const orderMap = new Map();
+              localArr.forEach((n, idx) => orderMap.set(n.id, idx));
+
+              const sortedNotes = [...dataNotes.notes].sort((a, b) => {
+                const orderA = orderMap.has(a.id) ? orderMap.get(a.id) : 9999;
+                const orderB = orderMap.has(b.id) ? orderMap.get(b.id) : 9999;
+                return orderA - orderB;
+              });
+
+              setNotes(sortedNotes);
+              localStorage.setItem('myits_notes', JSON.stringify(sortedNotes));
+            } catch (e) {
+              setNotes(dataNotes.notes);
+              localStorage.setItem('myits_notes', JSON.stringify(dataNotes.notes));
+            }
+          } else {
+            setNotes(dataNotes.notes);
+            localStorage.setItem('myits_notes', JSON.stringify(dataNotes.notes));
+          }
         }
       }
 
@@ -530,7 +551,7 @@ export function AppProvider({ children }) {
     );
 
     try {
-      await fetch('/api/tasks/' + taskId, {
+      await fetch('/api/tasks?id=' + taskId, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedTaskObj),
@@ -568,7 +589,7 @@ export function AppProvider({ children }) {
 
   const deleteTask = (taskId) => {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    fetch('/api/tasks/' + taskId, { method: 'DELETE' }).catch((err) =>
+    fetch('/api/tasks?id=' + taskId, { method: 'DELETE' }).catch((err) =>
       console.warn('[deleteTask API Notice]:', err.message)
     );
   };
@@ -589,7 +610,7 @@ export function AppProvider({ children }) {
     );
 
     if (updatedTaskObj) {
-      fetch('/api/tasks/' + taskId, {
+      fetch('/api/tasks?id=' + taskId, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedTaskObj),
@@ -612,7 +633,7 @@ export function AppProvider({ children }) {
     );
 
     if (updatedTaskObj) {
-      fetch('/api/tasks/' + taskId, {
+      fetch('/api/tasks?id=' + taskId, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedTaskObj),
@@ -657,7 +678,7 @@ export function AppProvider({ children }) {
       prev.filter((e) => e.id !== cleanId && e.id !== eventId && ('event_' + e.id) !== eventId)
     );
 
-    fetch('/api/schedules/' + cleanId, { method: 'DELETE' }).catch((err) =>
+    fetch('/api/schedules?id=' + cleanId, { method: 'DELETE' }).catch((err) =>
       console.warn('[deleteScheduleEvent API Notice]:', err.message)
     );
   };
@@ -686,7 +707,7 @@ export function AppProvider({ children }) {
           })
         );
         if (updatedCourse) {
-          fetch('/api/courses/' + courseId, {
+          fetch('/api/courses?id=' + courseId, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updatedCourse),
@@ -697,7 +718,7 @@ export function AppProvider({ children }) {
       const courseId = item.rawId || item.originalCourse?.id;
       if (courseId) {
         setCourses((prev) => prev.filter((c) => c.id !== courseId));
-        fetch('/api/courses/' + courseId, { method: 'DELETE' }).catch((err) =>
+        fetch('/api/courses?id=' + courseId, { method: 'DELETE' }).catch((err) =>
           console.warn('[deleteScheduleItem course API Notice]:', err.message)
         );
       }
@@ -744,7 +765,7 @@ export function AppProvider({ children }) {
       prev.map((n) => (n.id === updatedNote.id ? { ...n, ...updatedNoteWithTime } : n))
     );
 
-    fetch('/api/notes/' + updatedNote.id, {
+    fetch('/api/notes?id=' + updatedNote.id, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedNoteWithTime),
@@ -753,7 +774,7 @@ export function AppProvider({ children }) {
 
   const deleteNote = (noteId) => {
     setNotes((prev) => prev.filter((n) => n.id !== noteId && n.parentId !== noteId));
-    fetch('/api/notes/' + noteId, { method: 'DELETE' }).catch((err) =>
+    fetch('/api/notes?id=' + noteId, { method: 'DELETE' }).catch((err) =>
       console.warn('[deleteNote API Notice]:', err.message)
     );
   };
