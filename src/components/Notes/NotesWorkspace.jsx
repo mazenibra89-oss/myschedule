@@ -29,8 +29,8 @@ export default function NotesWorkspace() {
   const { notes, addNote, updateNote, deleteNote, reorderNotes, courses } = useApp();
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('Akademik'); // 'Akademik' | 'Non-Akademik'
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedNoteId, setSelectedNoteId] = useState(notes[0]?.id || null);
-  const [activeNote, setActiveNote] = useState(notes[0] || null);
+  const [selectedNoteId, setSelectedNoteId] = useState(() => notes[0]?.id || null);
+  const [activeNote, setActiveNote] = useState(() => notes[0] || null);
   const [expandedParents, setExpandedParents] = useState({ note_c1: true, note_c2: true });
   const [previewMode, setPreviewMode] = useState(true);
   const [activeMediaPreview, setActiveMediaPreview] = useState(null);
@@ -39,13 +39,16 @@ export default function NotesWorkspace() {
 
   const fileInputRef = useRef(null);
 
-  // Sync activeNote with notes state only when note selection changes or in Preview Mode
+  // Sync activeNote with notes state automatically
   useEffect(() => {
-    if (selectedNoteId) {
-      const found = notes.find((n) => n.id === selectedNoteId);
-      if (found) {
-        if (previewMode || !activeNote || activeNote.id !== selectedNoteId) {
-          setActiveNote(found);
+    if (notes && notes.length > 0) {
+      const currentSelected = notes.find((n) => n.id === selectedNoteId);
+      if (!currentSelected) {
+        setSelectedNoteId(notes[0].id);
+        setActiveNote(notes[0]);
+      } else {
+        if (previewMode || !activeNote || activeNote.id !== currentSelected.id) {
+          setActiveNote(currentSelected);
         }
       }
     }
