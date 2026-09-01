@@ -70,6 +70,29 @@ export default function NotesWorkspace() {
     setActiveNote(note);
   };
 
+  // Helper for file metadata badge & color styling (PPTX, DOCX, XLSX, PDF, ZIP, etc.)
+  const getFileMeta = (fileName = '', fileType = '') => {
+    const name = String(fileName || '').toLowerCase();
+    const type = String(fileType || '').toLowerCase();
+
+    if (name.endsWith('.pptx') || name.endsWith('.ppt') || type.includes('presentation') || type.includes('powerpoint')) {
+      return { label: 'PPTX', color: 'text-amber-400 bg-amber-500/15 border-amber-500/30' };
+    }
+    if (name.endsWith('.docx') || name.endsWith('.doc') || type.includes('wordprocessingml') || type.includes('msword')) {
+      return { label: 'DOCX', color: 'text-blue-400 bg-blue-500/15 border-blue-500/30' };
+    }
+    if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv') || type.includes('spreadsheet') || type.includes('excel')) {
+      return { label: 'XLSX', color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' };
+    }
+    if (name.endsWith('.pdf') || type.includes('pdf')) {
+      return { label: 'PDF', color: 'text-red-400 bg-red-500/15 border-red-500/30' };
+    }
+    if (name.endsWith('.zip') || name.endsWith('.rar') || name.endsWith('.7z') || type.includes('zip') || type.includes('compressed')) {
+      return { label: 'ZIP', color: 'text-purple-400 bg-purple-500/15 border-purple-500/30' };
+    }
+    return { label: 'FILE', color: 'text-[#38bdf8] bg-[#0099dd]/15 border-[#0099dd]/30' };
+  };
+
   // Helper to extract raw direct URL for Google Drive, Vercel Blob, Base64 images
   const getDirectImageUrl = (url) => {
     if (!url || typeof url !== 'string') return '';
@@ -243,13 +266,14 @@ export default function NotesWorkspace() {
     e.target.value = '';
   };
 
-  // Universal File & Image Preview Handler (Handles Data URLs, Blob URLs & HTTP links without browser blocks)
+  // Universal File & Image Preview Handler (Handles PPTX, DOCX, XLSX, PDF, Images, Data URLs)
   const handlePreviewFile = (block) => {
     if (!block || !block.url || typeof block.url !== 'string') {
       alert('URL file atau gambar tidak valid.');
       return;
     }
     const url = block.url;
+    const fileName = String(block.fileName || block.content || '').toLowerCase();
 
     // 1. Image preview modal
     if (block.type === 'image' || (block.fileType && String(block.fileType).startsWith('image/')) || url.startsWith('data:image/')) {
@@ -262,7 +286,22 @@ export default function NotesWorkspace() {
       return;
     }
 
-    // 2. Data URL Base64 preview conversion to Blob Object URL
+    // 2. Office Documents (PPTX, PPT, DOCX, DOC, XLSX, XLS) Preview Web Viewer
+    const isOfficeDoc = fileName.endsWith('.pptx') || fileName.endsWith('.ppt') ||
+                        fileName.endsWith('.docx') || fileName.endsWith('.doc') ||
+                        fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+
+    if (isOfficeDoc && (url.startsWith('http://') || url.startsWith('https://'))) {
+      if (url.includes('drive.google.com/file/d/')) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`;
+      window.open(officeViewerUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // 3. Data URL Base64 preview conversion to Blob Object URL
     if (url.startsWith('data:')) {
       try {
         const parts = url.split(',');
@@ -289,7 +328,7 @@ export default function NotesWorkspace() {
       }
     }
 
-    // 3. Direct HTTP / Vercel Blob / Google Drive URLs
+    // 4. Direct HTTP / PDF / Vercel Blob / Google Drive URLs
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
@@ -402,11 +441,11 @@ export default function NotesWorkspace() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-fade-in">
-      {/* Hidden File Input for Attachments */}
+      {/* Hidden File Input for Attachments (PPTX, DOCX, XLSX, PDF, ZIP, Images, etc.) */}
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.zip,.txt"
+        accept="*/*"
         className="hidden"
         onChange={handleFileUpload}
       />
@@ -793,38 +832,41 @@ export default function NotesWorkspace() {
                             </div>
                           )}
 
-                          {/* File Attachment Card */}
-                          {block.type === 'file' && (
-                            <div className="p-4 rounded-2xl bg-[#14151a] border border-[#272935] flex items-center justify-between gap-4">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-10 h-10 rounded-xl bg-[#20222d] border border-[#2a2c3a] flex items-center justify-center text-[#0099dd] shrink-0">
-                                  <FileText className="w-5 h-5" />
+                          {/* File Attachment Card (PPTX, DOCX, XLSX, PDF, ZIP, TXT) */}
+                          {block.type === 'file' && (() => {
+                            const meta = getFileMeta(block.fileName || block.content, block.fileType);
+                            return (
+                              <div className="p-4 rounded-2xl bg-[#14151a] border border-[#272935] flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs border shrink-0 ${meta.color}`}>
+                                    {meta.label}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-bold text-white truncate">{block.fileName || block.content}</p>
+                                    <p className="text-[10px] text-[#787e91]">{block.fileSize || 'Dokumen'}</p>
+                                  </div>
                                 </div>
-                                <div className="min-w-0">
-                                  <p className="text-xs font-bold text-white truncate">{block.fileName || block.content}</p>
-                                  <p className="text-[10px] text-[#787e91]">{block.fileSize || 'Dokumen'}</p>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePreviewFile(block)}
+                                    className="px-3 py-1.5 rounded-xl bg-[#20222d] hover:bg-[#2a2d3c] text-[#38bdf8] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span>Lihat</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadFile(block)}
+                                    className="px-3 py-1.5 rounded-xl bg-[#0099dd] hover:bg-[#0088cc] text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-cyan-900/20 cursor-pointer"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                    <span>Unduh</span>
+                                  </button>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => handlePreviewFile(block)}
-                                  className="px-3 py-1.5 rounded-xl bg-[#20222d] hover:bg-[#2a2d3c] text-[#38bdf8] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                  <span>Lihat</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDownloadFile(block)}
-                                  className="px-3 py-1.5 rounded-xl bg-[#0099dd] hover:bg-[#0088cc] text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-cyan-900/20 cursor-pointer"
-                                >
-                                  <Download className="w-3.5 h-3.5" />
-                                  <span>Unduh</span>
-                                </button>
-                              </div>
-                            </div>
-                          )}
+                            );
+                          })()}
                         </div>
                       );
                     }
