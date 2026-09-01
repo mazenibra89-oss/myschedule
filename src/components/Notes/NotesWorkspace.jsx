@@ -39,15 +39,17 @@ export default function NotesWorkspace() {
 
   const fileInputRef = useRef(null);
 
-  // Sync activeNote with notes state
+  // Sync activeNote with notes state only when note selection changes or in Preview Mode
   useEffect(() => {
     if (selectedNoteId) {
       const found = notes.find((n) => n.id === selectedNoteId);
       if (found) {
-        setActiveNote(found);
+        if (previewMode || !activeNote || activeNote.id !== selectedNoteId) {
+          setActiveNote(found);
+        }
       }
     }
-  }, [notes, selectedNoteId]);
+  }, [notes, selectedNoteId, previewMode]);
 
   const toggleExpandParent = (parentId, e) => {
     e.stopPropagation();
@@ -58,13 +60,16 @@ export default function NotesWorkspace() {
   };
 
   const handleSelectNote = (note) => {
+    if (!previewMode && activeNote && activeNote.id !== note.id) {
+      updateNote(activeNote);
+    }
     setSelectedNoteId(note.id);
     setActiveNote(note);
   };
 
   // Helper to extract raw direct URL for Google Drive, Vercel Blob, Base64 images
   const getDirectImageUrl = (url) => {
-    if (!url) return '';
+    if (!url || typeof url !== 'string') return '';
     if (url.includes('drive.google.com/file/d/')) {
       const match = url.match(/\/d\/([^/]+)/);
       if (match && match[1]) {
@@ -161,11 +166,10 @@ export default function NotesWorkspace() {
     const file = e.target.files?.[0];
     if (!file || !activeNote) return;
 
-    const isImage = file.type.startsWith('image/');
+    const isImage = file.type ? file.type.startsWith('image/') : false;
     const formattedSize = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
 
     try {
-      // 1. Prepare FormData for API Route /api/files/upload
       const formData = new FormData();
       formData.append('file', file);
 
@@ -176,46 +180,52 @@ export default function NotesWorkspace() {
 
       if (res.ok) {
         const data = await res.json();
-        if (data.success) {
-          const targetUrl = data.file?.drive_view_link || data.url;
-          const fileBlock = {
-            id: 'b_file_' + Date.now(),
-            type: isImage ? 'image' : 'file',
-            fileName: data.file?.name || file.name,
-            fileSize: formattedSize,
-            fileType: file.type,
-            url: targetUrl,
-            driveFileId: data.file?.drive_file_id,
-            driveViewLink: targetUrl,
-            content: data.file?.name || file.name
-          };
+        if (data && data.success && (data.file?.drive_view_link || data.url)) {
+          const rawUrl = data.file?.drive_view_link || data.url;
+          const targetUrl = typeof rawUrl === 'string' ? rawUrl : '';
 
-          const updated = {
-            ...activeNote,
-            blocks: [...(activeNote.blocks || []), fileBlock]
-          };
-          setActiveNote(updated);
-          updateNote(updated);
-          e.target.value = '';
-          return;
+          if (targetUrl) {
+            const fileBlock = {
+              id: 'b_file_' + Date.now(),
+              type: isImage ? 'image' : 'file',
+              fileName: data.file?.name || file.name || 'File Sisipan',
+              fileSize: formattedSize,
+              fileType: file.type || 'application/octet-stream',
+              url: targetUrl,
+              driveFileId: data.file?.drive_file_id || '',
+              driveViewLink: targetUrl,
+              content: data.file?.name || file.name || 'File Sisipan'
+            };
+
+            const updated = {
+              ...activeNote,
+              blocks: [...(activeNote.blocks || []), fileBlock]
+            };
+            setActiveNote(updated);
+            updateNote(updated);
+            e.target.value = '';
+            return;
+          }
         }
       }
     } catch (apiErr) {
       console.warn('[Upload API Notice] Falling back to local data URL mode:', apiErr.message);
     }
 
-    // Local Fallback if API route is not running locally
+    // Local Fallback if API route is not running locally or returns non-string URL
     const reader = new FileReader();
     reader.onload = (uploadEvent) => {
       const fileDataUrl = uploadEvent.target?.result;
+      if (!fileDataUrl || typeof fileDataUrl !== 'string') return;
+
       const fileBlock = {
         id: 'b_file_' + Date.now(),
         type: isImage ? 'image' : 'file',
-        fileName: file.name,
+        fileName: file.name || 'File Sisipan',
         fileSize: formattedSize,
-        fileType: file.type,
+        fileType: file.type || 'application/octet-stream',
         url: fileDataUrl,
-        content: file.name
+        content: file.name || 'File Sisipan'
       };
 
       const updated = {
@@ -232,14 +242,15 @@ export default function NotesWorkspace() {
 
   // Universal File & Image Preview Handler (Handles Data URLs, Blob URLs & HTTP links without browser blocks)
   const handlePreviewFile = (block) => {
-    if (!block || !block.url) {
-      alert('URL file tidak ditemukan.');
+    if (!block || !block.url || typeof block.url !== 'string') {
+      alert('URL file atau gambar tidak valid.');
       return;
     }
+    const url = block.url;
 
     // 1. Image preview modal
-    if (block.type === 'image' || (block.fileType && block.fileType.startsWith('image/')) || block.url.startsWith('data:image/')) {
-      const directUrl = getDirectImageUrl(block.url);
+    if (block.type === 'image' || (block.fileType && String(block.fileType).startsWith('image/')) || url.startsWith('data:image/')) {
+      const directUrl = getDirectImageUrl(url);
       setActiveMediaPreview({
         url: directUrl,
         fileName: block.fileName || block.content || 'Gambar Sisipan',
@@ -249,12 +260,12 @@ export default function NotesWorkspace() {
     }
 
     // 2. Data URL Base64 preview conversion to Blob Object URL
-    if (block.url.startsWith('data:')) {
+    if (url.startsWith('data:')) {
       try {
-        const parts = block.url.split(',');
-        const mimeMatch = parts[0].match(/:(.*?);/);
+        const parts = url.split(',');
+        const mimeMatch = parts[0]?.match(/:(.*?);/);
         const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
-        const bstr = atob(parts[1]);
+        const bstr = atob(parts[1] || '');
         let n = bstr.length;
         const u8arr = new Uint8Array(n);
         while (n--) {
@@ -276,24 +287,24 @@ export default function NotesWorkspace() {
     }
 
     // 3. Direct HTTP / Vercel Blob / Google Drive URLs
-    window.open(block.url, '_blank', 'noopener,noreferrer');
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // Universal File & Image Download Handler
   const handleDownloadFile = (block) => {
-    if (!block || !block.url) {
-      alert('URL file tidak ditemukan.');
+    if (!block || !block.url || typeof block.url !== 'string') {
+      alert('URL file atau gambar tidak valid.');
       return;
     }
-
+    const url = block.url;
     const fileName = block.fileName || block.content || 'file_catatan';
 
-    if (block.url.startsWith('data:')) {
+    if (url.startsWith('data:')) {
       try {
-        const parts = block.url.split(',');
-        const mimeMatch = parts[0].match(/:(.*?);/);
+        const parts = url.split(',');
+        const mimeMatch = parts[0]?.match(/:(.*?);/);
         const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-        const bstr = atob(parts[1]);
+        const bstr = atob(parts[1] || '');
         let n = bstr.length;
         const u8arr = new Uint8Array(n);
         while (n--) {
@@ -315,7 +326,7 @@ export default function NotesWorkspace() {
     }
 
     const a = document.createElement('a');
-    a.href = block.url;
+    a.href = url;
     a.download = fileName;
     a.target = '_blank';
     document.body.appendChild(a);
@@ -325,10 +336,9 @@ export default function NotesWorkspace() {
 
   const handleUpdateBlockContent = (blockId, newContent) => {
     if (!activeNote) return;
-    const updatedBlocks = activeNote.blocks.map((b) => (b.id === blockId ? { ...b, content: newContent } : b));
+    const updatedBlocks = (activeNote.blocks || []).map((b) => (b.id === blockId ? { ...b, content: newContent } : b));
     const updated = { ...activeNote, blocks: updatedBlocks };
     setActiveNote(updated);
-    updateNote(updated);
   };
 
   // Delete Block Helper (Removes specific block, image, or file attachment)
@@ -595,15 +605,20 @@ export default function NotesWorkspace() {
                   {/* Top Action Buttons (Preview Mode, Copy, + Sub-Page, Hapus Catatan) */}
                   <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
                     <button
-                      onClick={() => setPreviewMode(!previewMode)}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                      onClick={() => {
+                        if (!previewMode && activeNote) {
+                          updateNote(activeNote);
+                        }
+                        setPreviewMode(!previewMode);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                         previewMode
-                          ? 'bg-[#0099dd] text-white border-[#0099dd]'
-                          : 'bg-[#20222d] hover:bg-[#282b3a] text-[#a0a6b7] border-[#2e3142]'
+                          ? 'bg-[#20222d] hover:bg-[#282b3a] text-[#a0a6b7] border-[#2e3142]'
+                          : 'bg-[#0099dd] text-white border-[#0099dd] shadow-md shadow-cyan-900/30'
                       }`}
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      <span>{previewMode ? 'Mode Edit (Ubah Catatan)' : 'Mode Preview (Baca Only)'}</span>
+                      <span>{previewMode ? 'Mode Edit (Ubah Catatan)' : 'Mode Preview (Simpan & Baca)'}</span>
                     </button>
 
                     <button
