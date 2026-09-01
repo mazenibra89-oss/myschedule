@@ -276,6 +276,7 @@ export default function NotesWorkspace() {
     }
     const url = block.url;
     const fileName = String(block.fileName || block.content || '').toLowerCase();
+    const meta = getFileMeta(fileName, block.fileType);
 
     // 1. Image preview modal
     if (block.type === 'image' || (block.fileType && String(block.fileType).startsWith('image/')) || url.startsWith('data:image/')) {
@@ -353,13 +354,19 @@ export default function NotesWorkspace() {
         return;
       } catch (err) {
         console.error('[Preview Data URL Error]:', err);
-        handleDownloadFile(block);
+        alert('Gagal memuat pratinjau berkas lokal. Silakan gunakan tombol Unduh.');
         return;
       }
     }
 
-    // 4. Direct HTTP / PDF / Vercel Blob / Google Drive URLs
-    window.open(url, '_blank', 'noopener,noreferrer');
+    // 5. Fallback in Document Preview Modal
+    setActiveDocumentPreview({
+      embedUrl: url,
+      url: url,
+      fileName: block.fileName || block.content || 'Pratinjau Dokumen',
+      label: meta.label,
+      rawBlock: block
+    });
   };
 
   // Universal File & Image Download Handler
