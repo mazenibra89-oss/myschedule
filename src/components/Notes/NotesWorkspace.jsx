@@ -22,6 +22,7 @@ import {
   Download,
   GripVertical,
   X,
+  ExternalLink,
   Image as ImageIcon
 } from 'lucide-react';
 
@@ -34,6 +35,7 @@ export default function NotesWorkspace() {
   const [expandedParents, setExpandedParents] = useState({ note_c1: true, note_c2: true });
   const [previewMode, setPreviewMode] = useState(true);
   const [activeMediaPreview, setActiveMediaPreview] = useState(null);
+  const [activeDocumentPreview, setActiveDocumentPreview] = useState(null);
   const [copied, setCopied] = useState(false);
   const [draggedNoteId, setDraggedNoteId] = useState(null);
 
@@ -286,22 +288,43 @@ export default function NotesWorkspace() {
       return;
     }
 
-    // 2. Office Documents (PPTX, PPT, DOCX, DOC, XLSX, XLS) Preview Web Viewer
-    const isOfficeDoc = fileName.endsWith('.pptx') || fileName.endsWith('.ppt') ||
-                        fileName.endsWith('.docx') || fileName.endsWith('.doc') ||
-                        fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
-
-    if (isOfficeDoc && (url.startsWith('http://') || url.startsWith('https://'))) {
-      if (url.includes('drive.google.com/file/d/')) {
-        window.open(url, '_blank', 'noopener,noreferrer');
+    // 2. Google Drive File Preview (Native Google Slide / Doc / Sheet viewer)
+    if (url.includes('drive.google.com/file/d/')) {
+      const match = url.match(/\/d\/([^/]+)/);
+      if (match && match[1]) {
+        const driveEmbedUrl = `https://drive.google.com/file/d/${match[1]}/preview`;
+        setActiveDocumentPreview({
+          embedUrl: driveEmbedUrl,
+          url: url,
+          fileName: block.fileName || block.content || 'Pratinjau Dokumen',
+          label: meta.label,
+          rawBlock: block
+        });
         return;
       }
-      const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`;
-      window.open(officeViewerUrl, '_blank', 'noopener,noreferrer');
+    }
+
+    // 3. HTTP / Vercel URLs for PPTX, DOCX, XLSX, PDF
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      const isOfficeDoc = fileName.endsWith('.pptx') || fileName.endsWith('.ppt') ||
+                          fileName.endsWith('.docx') || fileName.endsWith('.doc') ||
+                          fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+
+      const embedUrl = isOfficeDoc
+        ? `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`
+        : url;
+
+      setActiveDocumentPreview({
+        embedUrl: embedUrl,
+        url: url,
+        fileName: block.fileName || block.content || 'Pratinjau Dokumen',
+        label: meta.label,
+        rawBlock: block
+      });
       return;
     }
 
-    // 3. Data URL Base64 preview conversion to Blob Object URL
+    // 4. Data URL Base64 preview conversion to Blob Object URL
     if (url.startsWith('data:')) {
       try {
         const parts = url.split(',');
@@ -316,10 +339,17 @@ export default function NotesWorkspace() {
         const fileBlob = new Blob([u8arr], { type: mime });
         const objectUrl = URL.createObjectURL(fileBlob);
 
-        const win = window.open(objectUrl, '_blank');
-        if (!win) {
-          handleDownloadFile(block);
-        }
+        const embedUrl = mime.includes('pdf')
+          ? objectUrl
+          : `https://docs.google.com/gview?url=${encodeURIComponent(objectUrl)}&embedded=true`;
+
+        setActiveDocumentPreview({
+          embedUrl: embedUrl,
+          url: objectUrl,
+          fileName: block.fileName || block.content || 'Pratinjau Dokumen',
+          label: meta.label,
+          rawBlock: block
+        });
         return;
       } catch (err) {
         console.error('[Preview Data URL Error]:', err);
@@ -1089,6 +1119,68 @@ export default function NotesWorkspace() {
                 <button
                   onClick={() => setActiveMediaPreview(null)}
                   className="btn-myits-secondary text-xs px-4 py-2"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* High Resolution Document Preview Modal (PPTX, DOCX, XLSX, PDF Viewer) */}
+      {activeDocumentPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in my-auto">
+          <div className="card-myits bg-[#181920] border-[#2c2f3d] w-full max-w-5xl h-[85vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col justify-between relative my-auto">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-[#282a36] bg-[#14151b] flex items-center justify-between">
+              <div className="flex items-center gap-2.5 truncate">
+                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  {activeDocumentPreview.label || 'DOC'}
+                </span>
+                <span className="text-xs font-bold text-white truncate">{activeDocumentPreview.fileName || 'Pratinjau Dokumen'}</span>
+              </div>
+              <button
+                onClick={() => setActiveDocumentPreview(null)}
+                className="p-1.5 rounded-xl bg-[#22242e] text-[#8e94a5] hover:text-white transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Embedded Document Viewer Frame */}
+            <div className="flex-1 bg-black/60 relative w-full h-full overflow-hidden">
+              <iframe
+                src={activeDocumentPreview.embedUrl}
+                title="Document Preview"
+                className="w-full h-full border-0"
+                allow="autoplay"
+              />
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="p-4 border-t border-[#282a36] bg-[#14151b] flex items-center justify-between gap-3">
+              <a
+                href={activeDocumentPreview.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 rounded-xl bg-[#20222d] hover:bg-[#2a2d3c] text-white text-xs font-semibold flex items-center gap-2 transition-all"
+              >
+                <ExternalLink className="w-4 h-4 text-[#0099dd]" />
+                <span>Buka Tab Baru</span>
+              </a>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleDownloadFile(activeDocumentPreview.rawBlock)}
+                  className="px-5 py-2 rounded-xl bg-[#0099dd] hover:bg-[#0088cc] text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-cyan-900/30 transition-all cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Unduh Berkas</span>
+                </button>
+                <button
+                  onClick={() => setActiveDocumentPreview(null)}
+                  className="btn-myits-secondary text-xs px-4 py-2 cursor-pointer"
                 >
                   Tutup
                 </button>
