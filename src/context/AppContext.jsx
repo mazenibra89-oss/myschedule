@@ -423,16 +423,48 @@ export function AppProvider({ children }) {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
+  // Helper for safe localStorage write (Strips heavy Base64 data URLs if quota is exceeded)
+  const safeSetLocalStorage = (key, valueObj) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(valueObj));
+    } catch (err) {
+      if (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014 || err.message?.includes('quota')) {
+        console.warn(`[localStorage QuotaExceeded]: Cleaning up heavy data URLs for key "${key}"...`);
+        try {
+          if (Array.isArray(valueObj)) {
+            const sanitized = valueObj.map((item) => {
+              if (item && item.blocks && Array.isArray(item.blocks)) {
+                return {
+                  ...item,
+                  blocks: item.blocks.map((b) => {
+                    if (b && typeof b.url === 'string' && b.url.startsWith('data:')) {
+                      return { ...b, url: '' }; // Strip heavy Base64 URL from localStorage cache
+                    }
+                    return b;
+                  })
+                };
+              }
+              return item;
+            });
+            localStorage.setItem(key, JSON.stringify(sanitized));
+          }
+        } catch (cleanErr) {
+          console.warn(`[localStorage Cleanup Notice]:`, cleanErr.message);
+        }
+      }
+    }
+  };
+
   // Sync state to local storage
-  useEffect(() => localStorage.setItem('myits_user', JSON.stringify(user)), [user]);
-  useEffect(() => localStorage.setItem('myits_courses', JSON.stringify(courses)), [courses]);
-  useEffect(() => localStorage.setItem('myits_events', JSON.stringify(scheduleEvents)), [scheduleEvents]);
-  useEffect(() => localStorage.setItem('myits_tasks', JSON.stringify(tasks)), [tasks]);
-  useEffect(() => localStorage.setItem('myits_notes', JSON.stringify(notes)), [notes]);
-  useEffect(() => localStorage.setItem('myits_databases', JSON.stringify(databases)), [databases]);
-  useEffect(() => localStorage.setItem('myits_habits', JSON.stringify(habits)), [habits]);
-  useEffect(() => localStorage.setItem('myits_moods', JSON.stringify(moodLogs)), [moodLogs]);
-  useEffect(() => localStorage.setItem('myits_finance', JSON.stringify(financeLogs)), [financeLogs]);
+  useEffect(() => safeSetLocalStorage('myits_user', user), [user]);
+  useEffect(() => safeSetLocalStorage('myits_courses', courses), [courses]);
+  useEffect(() => safeSetLocalStorage('myits_events', scheduleEvents), [scheduleEvents]);
+  useEffect(() => safeSetLocalStorage('myits_tasks', tasks), [tasks]);
+  useEffect(() => safeSetLocalStorage('myits_notes', notes), [notes]);
+  useEffect(() => safeSetLocalStorage('myits_databases', databases), [databases]);
+  useEffect(() => safeSetLocalStorage('myits_habits', habits), [habits]);
+  useEffect(() => safeSetLocalStorage('myits_moods', moodLogs), [moodLogs]);
+  useEffect(() => safeSetLocalStorage('myits_finance', financeLogs), [financeLogs]);
 
   // Centralized Real-time Auto-Sync Engine from PostgreSQL Database
   const fetchAllDataFromDB = async () => {
@@ -456,14 +488,14 @@ export function AppProvider({ children }) {
               });
 
               setNotes(sortedNotes);
-              localStorage.setItem('myits_notes', JSON.stringify(sortedNotes));
+              safeSetLocalStorage('myits_notes', sortedNotes);
             } catch (e) {
               setNotes(dataNotes.notes);
-              localStorage.setItem('myits_notes', JSON.stringify(dataNotes.notes));
+              safeSetLocalStorage('myits_notes', dataNotes.notes);
             }
           } else {
             setNotes(dataNotes.notes);
-            localStorage.setItem('myits_notes', JSON.stringify(dataNotes.notes));
+            safeSetLocalStorage('myits_notes', dataNotes.notes);
           }
         }
       }
@@ -474,7 +506,7 @@ export function AppProvider({ children }) {
         const dataTasks = await resTasks.json();
         if (dataTasks && dataTasks.success && Array.isArray(dataTasks.tasks)) {
           setTasks(dataTasks.tasks);
-          localStorage.setItem('myits_tasks', JSON.stringify(dataTasks.tasks));
+          safeSetLocalStorage('myits_tasks', dataTasks.tasks);
         }
       }
 
@@ -484,7 +516,7 @@ export function AppProvider({ children }) {
         const dataSchedules = await resSchedules.json();
         if (dataSchedules && dataSchedules.success && Array.isArray(dataSchedules.events)) {
           setScheduleEvents(dataSchedules.events);
-          localStorage.setItem('myits_events', JSON.stringify(dataSchedules.events));
+          safeSetLocalStorage('myits_events', dataSchedules.events);
         }
       }
 
@@ -494,7 +526,7 @@ export function AppProvider({ children }) {
         const dataCourses = await resCourses.json();
         if (dataCourses && dataCourses.success && Array.isArray(dataCourses.courses)) {
           setCourses(dataCourses.courses);
-          localStorage.setItem('myits_courses', JSON.stringify(dataCourses.courses));
+          safeSetLocalStorage('myits_courses', dataCourses.courses);
         }
       }
     } catch (err) {
@@ -781,7 +813,7 @@ export function AppProvider({ children }) {
 
   const reorderNotes = (newNotesList) => {
     setNotes(newNotesList);
-    localStorage.setItem('myits_notes', JSON.stringify(newNotesList));
+    safeSetLocalStorage('myits_notes', newNotesList);
   };
 
   const addDatabaseRow = (databaseId, newRowObj) => {
